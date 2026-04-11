@@ -1,0 +1,29 @@
+# TailLog Labeling Pipeline — Python 의존성
+
+# 포즈 추출
+ultralytics>=8.3.0
+opencv-python>=4.9.0
+
+# YouTube 수집
+yt-dlp>=2024.1.0
+
+# LLM 클라이언트
+ollama>=0.2.0
+
+# Supabase
+supabase>=2.3.0
+
+# 데이터 모델
+pydantic>=2.6.0
+
+# 유틸리티
+python-dotenv>=1.0.0
+numpy>=1.26.0
+tqdm>=4.66.0
+
+# 테스트
+pytest>=8.0.0
+pytest-asyncio>=0.23.0
+
+# 개발 도구
+ruff>=0.3.0

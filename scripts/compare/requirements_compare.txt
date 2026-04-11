@@ -1,0 +1,25 @@
+# 비교 테스트 전용 의존성
+# pip install -r scripts/compare/requirements_compare.txt
+
+# 영상 처리
+yt-dlp>=2024.1.0
+opencv-python>=4.9.0
+Pillow>=10.0.0
+
+# YOLOv8 (기존 requirements.txt에 있으면 생략 가능)
+ultralytics>=8.3.0
+torch>=2.0.0
+torchvision>=0.15.0
+
+# SuperAnimal — 다음 중 하나 선택
+# 옵션 A: 경량 (권장)
+dlclibrary>=0.0.6
+huggingface-hub>=0.20.0
+
+# 옵션 B: 풀 설치 (더 많은 기능, 무겁음)
+# deeplabcut>=2.3.0
+
+# 유틸리티
+numpy>=1.26.0
+psutil>=6.0.0
+tqdm>=4.66.0
