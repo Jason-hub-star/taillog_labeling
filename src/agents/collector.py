@@ -38,6 +38,7 @@ class Collector:
             raise RuntimeError("yt-dlp 패키지 필요: pip install yt-dlp")
 
         # 1. 메타데이터 추출
+        _TRANSIENT = (ConnectionError, TimeoutError, OSError)
         try:
             ydl_opts = {
                 "quiet": True,
@@ -46,8 +47,12 @@ class Collector:
             }
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(url, download=False)
+        except _TRANSIENT as e:
+            self._record_failure(url, f"메타 추출 실패 (transient): {str(e)}")
+            return None
         except Exception as e:
-            self._record_failure(url, f"메타 추출 실패: {str(e)}")
+            # permanent: 잘못된 URL, 비공개 영상, 저작권 차단 등
+            self._record_failure(url, f"메타 추출 실패 (permanent): {str(e)}")
             return None
 
         # 2. 영상 품질 확인 (해상도, 길이)
@@ -101,15 +106,14 @@ class Collector:
 
     def _download_video(self, url: str, info: Dict) -> Optional[str]:
         """yt-dlp로 영상 다운로드"""
+        _TRANSIENT = (ConnectionError, TimeoutError, OSError)
         try:
             video_id = info.get("id", "unknown")
             output_path = os.path.join(self.cache_dir, f"{video_id}.mp4")
 
-            # 이미 존재하면 반환
             if os.path.exists(output_path):
                 return output_path
 
-            # 다운로드
             ydl_opts = {
                 "format": "best[height>=480]/best",
                 "outtmpl": os.path.join(self.cache_dir, "%(id)s.%(ext)s"),
@@ -121,8 +125,11 @@ class Collector:
             if os.path.exists(output_path):
                 return output_path
             return None
+        except _TRANSIENT as e:
+            print(f"다운로드 실패 (transient, 재시도 가능): {str(e)}")
+            return None
         except Exception as e:
-            print(f"다운로드 실패: {str(e)}")
+            print(f"다운로드 실패 (permanent): {str(e)}")
             return None
 
     def _record_failure(self, url: str, error_msg: str):

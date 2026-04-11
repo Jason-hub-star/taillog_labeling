@@ -71,7 +71,8 @@ class SupabaseManager:
                 with conn.cursor() as cur:
                     cur.execute("SELECT 1")
             return True
-        except Exception:
+        except Exception as e:
+            print(f"Supabase 연결 실패: {str(e)}")
             return False
 
 

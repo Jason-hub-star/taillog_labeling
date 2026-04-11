@@ -150,6 +150,9 @@ class Database:
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_labeling_runs_status ON labeling_runs(status)")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_behavior_labels_status ON behavior_labels(review_status)")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_behavior_labels_synced ON behavior_labels(synced)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_behavior_labels_category ON behavior_labels(category)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_behavior_labels_created_at ON behavior_labels(created_at)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_sync_attempts_label_id ON sync_attempts(label_id)")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_pose_results_run_id ON pose_results(run_id)")
 
             conn.commit()

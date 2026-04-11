@@ -115,7 +115,7 @@ class PoseExtractor:
             if not dry_run:
                 for pose_result in pose_results:
                     keypoints_json = json.dumps(
-                        [{"x": kp.x, "y": kp.y, "c": kp.c} for kp in pose_result.keypoints]
+                        [{"bodypart": kp.bodypart, "x": kp.x, "y": kp.y, "c": kp.c} for kp in pose_result.keypoints]
                     )
                     self.db.insert(
                         """
@@ -140,7 +140,7 @@ class PoseExtractor:
                     [
                         {
                             "frame_id": pr.frame_id,
-                            "keypoints": [{"x": kp.x, "y": kp.y, "c": kp.c} for kp in pr.keypoints],
+                            "keypoints": [{"bodypart": kp.bodypart, "x": kp.x, "y": kp.y, "c": kp.c} for kp in pr.keypoints],
                             "confidence": pr.confidence,
                         }
                         for pr in pose_results

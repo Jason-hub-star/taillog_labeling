@@ -65,8 +65,9 @@ class BehaviorClassifier:
             result = self.llm.parse_json_response(response["content"])
             classifier_output = ClassifierOutput(**result)
         except Exception as e:
-            print(f"LLM 분류 실패: {str(e)}")
-            # critic에 전달하기 위해 기본값으로 생성 후 반환
+            # LLM 실패 시 기본값(unknown, 0.3)으로 진행 — critic이 human_review로 분류함
+            # confidence=0.3 이므로 quality_gate에서 rejected 또는 human_review 처리됨
+            print(f"[WARN] LLM 분류 실패 → 기본값 사용 (frame_id={frame_id}): {str(e)}")
             classifier_output = ClassifierOutput(
                 category="unknown",
                 label="unknown",
