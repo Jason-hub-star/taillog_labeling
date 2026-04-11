@@ -25,11 +25,11 @@ if [ ! -f "$URLS_FILE" ]; then
 fi
 
 echo "📹 [1/4] 영상 다운로드 + 프레임 추출..."
-python scripts/compare/download.py --urls-file "$URLS_FILE"
+python3 scripts/compare/download.py --urls-file "$URLS_FILE"
 
 echo ""
 echo "🤖 [2/4] YOLOv8n-pose 실행..."
-python scripts/compare/run_yolo.py \
+python3 scripts/compare/run_yolo.py \
     --frames-dir data/cache/compare/frames \
     --output-dir data/cache/compare/yolo_results \
     --conf "$CONF"
@@ -37,13 +37,13 @@ python scripts/compare/run_yolo.py \
 echo ""
 echo "🦮 [3/4] SuperAnimal 실행..."
 # SuperAnimal은 프레임이 아닌 비디오 파일 직접 처리
-python scripts/compare/run_superanimal.py \
+python3 scripts/compare/run_superanimal.py \
     --video-dir data/cache/compare/videos \
     --output-dir data/cache/compare/superanimal_results
 
 echo ""
 echo "📊 [4/4] 시각화 + 리포트 생성..."
-python scripts/compare/visualize.py \
+python3 scripts/compare/visualize.py \
     --yolo-dir data/cache/compare/yolo_results \
     --superanimal-dir data/cache/compare/superanimal_results \
     --output-dir data/exports

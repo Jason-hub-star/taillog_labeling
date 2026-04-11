@@ -44,25 +44,14 @@
 - **Pro 전환 시점**: 라벨 누적 데이터가 400MB 초과하거나 24/7 운영 필요 시
 - **마감**: Phase 3
 
-### OD-07: SuperAnimal vs YOLOv8-pose 선택 🔴 개발 시작 전 필수
-- **질문**: 포즈 추출 모델로 YOLOv8n-pose와 SuperAnimal 중 어떤 것을 쓸 것인가?
-- **⚠️ 개발 시작 전에 반드시 비교 테스트 완료 후 결정해야 함**
-  - 결정 이후에 교체하면 keypoint 형식, 파이프라인 전체 수정 필요
-  - 영상 2~3개 + 30분이면 결론 가능
-- **배경**:
-  - YOLOv8n-pose: 강아지 전용 mAP 미공개, 인간 COCO 기준 mAP 50.0
-  - SuperAnimal-Quadruped: 강아지 포함 Zero-shot mAP **84.6** (Nature Comm. 2024)
-  - 점수 기준이 달라 단순 비교 불가 → 실제 강아지 영상으로 직접 확인 필요
-- **비교 방법**:
-  1. 강아지 영상 2~3개 준비 (소형견 포함)
-  2. YOLOv8n-pose 실행 → keypoint 시각화 저장
-  3. SuperAnimal (HuggingFace 경량 버전) 실행 → keypoint 시각화 저장
-  4. 탐지율, keypoint 품질, 속도 비교 후 결정
-- **판단 기준**:
-  - SuperAnimal 탐지율이 유의미하게 높으면 → SuperAnimal 채택 (파이프라인 설계 변경)
-  - 비슷하면 → YOLOv8 유지 (설정 간단, 현재 스택 호환)
-- **마감**: **개발 시작 전 (Phase 0)**
-- **담당**: 주인님 (영상 준비) + Claude (테스트 스크립트 작성)
+### ~~OD-07: SuperAnimal vs YOLOv8-pose 선택~~ ✅ RESOLVED
+- **결정**: **SuperAnimal 채택** — YOLOv8 평균 탐지율 18.3%로 실용 수준 미달
+- **근거**: 강아지 영상 5개(60프레임씩) YOLOv8 테스트 결과
+  - 포메라니안 8.3%, 홈캠 6.7%, 강아지 두마리 0.0% → 소형견/다중개 탐지 불가
+  - SuperAnimal-Quadruped Zero-shot mAP 84.6 (Nature Comm. 2024) 기준 우월 예상
+  - deeplabcut Python 3.14 미호환 → 직접 비교 불가 (단, YOLOv8 탐지율 기준으로 판단 충분)
+- **후속 조치**: deeplabcut 설치용 Python 3.10/3.11 가상환경 구성 필요 (Phase 1 전)
+- **해결일**: 2026-04-11
 
 ---
 
@@ -70,6 +59,9 @@
 
 | ID | 결정 | 날짜 |
 |----|------|------|
-| — | — | — |
+| OD-01 | anonymous dog UUID `612a3d4f-6fc1-406e-8a15-5430a096eee2` 사용 | 2026-04-11 |
+| OD-02 | `type_id` 없음, `behavior_type TEXT` 사용 | 2026-04-11 |
+| OD-04 | Telegram 봇 `@TailLog_Watchdog_bot` 설정 완료 | 2026-04-11 |
+| OD-07 | SuperAnimal 채택 (YOLOv8 탐지율 18.3% 실용 미달) | 2026-04-11 |
 
 > 해결 시: TECH-STACK-DECISIONS.md 업데이트 → DECISION-LOG.md 기록 → 여기서 Resolved 이동

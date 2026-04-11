@@ -9,9 +9,13 @@
 ## A. 모델 결정 (B-블록)
 
 ### A-01. 포즈 추출 모델
-- **🔴 PENDING**: OD-07 비교 테스트 완료 후 확정 → `docs/status/PRE-DEV-CHECKLIST.md`
-- **단계별 전략**: `docs/ref/MODEL-ROADMAP.md` 참조
-- **확정 후 이 항목에 기입할 내용**: 모델명, keypoint 포맷, conf 임계값, 처리 속도
+- **✅ 확정**: **SuperAnimal-Quadruped** (2026-04-11, OD-07 해결)
+- **결정 근거**: YOLOv8n-pose 강아지 탐지율 평균 18.3% (실용 수준 미달) → SuperAnimal 채택
+  - 소형견 탐지 특히 취약 (포메라니안 8.3%, 홈캠 6.7%, 다중 강아지 0%)
+  - SuperAnimal-Quadruped Zero-shot mAP **84.6** (Nature Comm. 2024)
+- **keypoint 포맷**: SuperAnimal quadruped (39-point) — COCO 17pt 아님
+- **conf 임계값**: 0.3 (SuperAnimal 기준, 추후 교정)
+- **설치 요건**: deeplabcut + Python 3.10 또는 3.11 가상환경 필요 (Python 3.14 미호환)
 - **공통 확정 항목**:
   - 프레임 추출 속도: `1 FPS`
   - 배치 크기: 기본 16, GPU 메모리 <4GB 시 8로 fallback

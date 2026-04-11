@@ -137,7 +137,7 @@ def create_comparison_images(
 def aggregate(results: Dict) -> Dict:
     det_rates, confs, kpt_valids, speeds, mems = [], [], [], [], []
     for v in results.values():
-        det_rates.append(v.get("detection_rate", 0))
+        det_rates.append(v.get("detection_rate_pct", v.get("detection_rate", 0)))
         confs.append(v.get("avg_confidence", 0))
         kpt_valids.append(v.get("keypoint_validity_pct", 0))
         speeds.append(v.get("avg_ms_per_frame", 0))
@@ -186,36 +186,51 @@ def generate_report(
         sv = superanimal_results.get(vname, {})
         lines.append(f"### {vname}\n\n")
         lines.append(f"| | YOLOv8n-pose | SuperAnimal |\n|--|--|--|\n")
-        lines.append(f"| 탐지율 | {yv.get('detection_rate',0)}% | {sv.get('detection_rate','-')}% |\n")
+        ydet = yv.get('detection_rate_pct', yv.get('detection_rate', 0))
+        sdet = sv.get('detection_rate_pct', sv.get('detection_rate', '-')) if sv else '-'
+        lines.append(f"| 탐지율 | {ydet}% | {sdet}% |\n")
         lines.append(f"| 신뢰도 | {yv.get('avg_confidence',0)} | {sv.get('avg_confidence','-')} |\n")
         lines.append(f"| 속도 | {yv.get('avg_ms_per_frame',0)}ms | {sv.get('avg_ms_per_frame','-')}ms |\n\n")
 
     # 최종 권장
-    det_diff = sm["det_rate"] - ym["det_rate"]
     lines.append("## 🎯 최종 권장\n\n")
 
-    if det_diff >= 15:
+    if not superanimal_results:
         lines += [
-            "**→ SuperAnimal 채택 권장**\n\n",
-            f"- 탐지율이 YOLOv8 대비 {det_diff:.1f}%p 높음\n",
-            "- 소형견 성능 우수\n",
-            "- `TECH-STACK-DECISIONS.md` A-01 → SuperAnimal로 업데이트 필요\n",
-            "- keypoint 포맷: COCO 17pt → SuperAnimal quadruped pt로 파이프라인 변경\n",
-        ]
-    elif det_diff <= -5:
-        lines += [
-            "**→ YOLOv8n-pose 유지**\n\n",
-            "- 탐지율이 SuperAnimal 이상\n",
-            "- 처리 속도 빠름, 기존 스택 호환\n",
-            "- `TECH-STACK-DECISIONS.md` A-01 확정\n",
+            "⚠️ **SuperAnimal 미실행** — deeplabcut이 Python 3.14와 호환되지 않음\n\n",
+            "- 원인: `tables==3.8.0` + `numpy<2.0` 요구 (Python 3.14 미지원)\n",
+            "- YOLOv8 단독 결과 기준 판단:\n\n",
+            f"  - 평균 탐지율: **{ym['det_rate']}%** (목표 80% 대비 매우 낮음)\n",
+            "  - 소형견(포메라니안) 8.3%, 홈캠 6.7% → 실용 수준 미달\n\n",
+            "**→ SuperAnimal 채택 권장 (YOLOv8 탐지율 불충분)**\n\n",
+            "- deeplabcut 설치 가능 환경 필요 (Python 3.10 또는 3.11 가상환경)\n",
+            "- `OPEN-DECISIONS.md` OD-07 → resolved 처리 예정\n",
+            "- `TECH-STACK-DECISIONS.md` A-01 → SuperAnimal 채택으로 업데이트 필요\n",
         ]
     else:
-        lines += [
-            f"**→ 성능 유사 ({det_diff:+.1f}%p) — 속도 기준 YOLOv8 권장**\n\n",
-            "- 탐지율 차이 미미\n",
-            "- YOLOv8이 더 빠르고 기존 스택과 호환\n",
-            "- `TECH-STACK-DECISIONS.md` A-01 확정\n",
-        ]
+        det_diff = sm["det_rate"] - ym["det_rate"]
+        if det_diff >= 15:
+            lines += [
+                "**→ SuperAnimal 채택 권장**\n\n",
+                f"- 탐지율이 YOLOv8 대비 {det_diff:.1f}%p 높음\n",
+                "- 소형견 성능 우수\n",
+                "- `TECH-STACK-DECISIONS.md` A-01 → SuperAnimal로 업데이트 필요\n",
+                "- keypoint 포맷: COCO 17pt → SuperAnimal quadruped pt로 파이프라인 변경\n",
+            ]
+        elif det_diff <= -5:
+            lines += [
+                "**→ YOLOv8n-pose 유지**\n\n",
+                "- 탐지율이 SuperAnimal 이상\n",
+                "- 처리 속도 빠름, 기존 스택 호환\n",
+                "- `TECH-STACK-DECISIONS.md` A-01 확정\n",
+            ]
+        else:
+            lines += [
+                f"**→ 성능 유사 ({det_diff:+.1f}%p) — 속도 기준 YOLOv8 권장**\n\n",
+                "- 탐지율 차이 미미\n",
+                "- YOLOv8이 더 빠르고 기존 스택과 호환\n",
+                "- `TECH-STACK-DECISIONS.md` A-01 확정\n",
+            ]
 
     report_path = Path(output_dir) / "compare_report.md"
     with open(report_path, "w", encoding="utf-8") as f:
