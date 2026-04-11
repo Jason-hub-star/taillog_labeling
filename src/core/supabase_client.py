@@ -1,43 +1,41 @@
-"""Supabase 클라이언트 초기화 및 래퍼"""
+"""Supabase 클라이언트 — PostgreSQL 직접 연결"""
 
 import os
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional
 
 try:
-    from supabase import create_client, Client
+    import psycopg2
+    import psycopg2.extras
 except ImportError:
-    create_client = None
-    Client = None
+    psycopg2 = None
 
 
 class SupabaseManager:
-    """Supabase 클라이언트 래퍼"""
+    """Supabase PostgreSQL 직접 연결 래퍼"""
 
-    def __init__(self, url: str = None, key: str = None):
+    def __init__(self, db_url: str = None):
         """
         Args:
-            url: Supabase URL (env: SUPABASE_URL)
-            key: service_role key (env: SUPABASE_SERVICE_ROLE_KEY)
+            db_url: PostgreSQL 연결 URL (env: SUPABASE_DB_URL)
         """
-        if create_client is None:
-            raise RuntimeError("supabase 패키지 필요: pip install supabase")
+        if psycopg2 is None:
+            raise RuntimeError("psycopg2 패키지 필요: pip install psycopg2-binary")
 
-        self.url = url or os.getenv("SUPABASE_URL")
-        self.key = key or os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+        self.db_url = db_url or os.getenv("SUPABASE_DB_URL")
+        if not self.db_url:
+            raise ValueError("SUPABASE_DB_URL 환경변수 필수")
 
-        if not self.url or not self.key:
-            raise ValueError("SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY 환경변수 필수")
-
-        self.client: Client = create_client(self.url, self.key)
+    def _connect(self):
+        return psycopg2.connect(self.db_url)
 
     def insert_behavior_log(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Supabase behavior_logs 테이블에 INSERT
+        behavior_logs 테이블에 INSERT
 
         Args:
             data: {
-                'dog_id': '...',
-                'type_id': 1,
+                'dog_id': '<uuid>',
+                'behavior_type': 'walk_pulling',
                 'antecedent': '...',
                 'behavior': '...',
                 'consequence': '...',
@@ -47,24 +45,31 @@ class SupabaseManager:
             }
 
         Returns:
-            Supabase 응답 (id 포함)
-
-        Raises:
-            Exception: API 오류
+            {'id': '<uuid>', ...}
         """
+        cols = list(data.keys())
+        vals = list(data.values())
+        placeholders = ", ".join(["%s"] * len(cols))
+        col_names = ", ".join(cols)
+
+        sql = f"INSERT INTO behavior_logs ({col_names}) VALUES ({placeholders}) RETURNING id"
+
         try:
-            response = self.client.table("behavior_logs").insert(data).execute()
-            if response.data and len(response.data) > 0:
-                return response.data[0]
-            return response.data
+            with self._connect() as conn:
+                with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                    cur.execute(sql, vals)
+                    row = cur.fetchone()
+                    conn.commit()
+                    return dict(row)
         except Exception as e:
-            raise RuntimeError(f"Supabase insert 실패: {str(e)}")
+            raise RuntimeError(f"Supabase insert 실패: {str(e)}") from e
 
     def check_connection(self) -> bool:
-        """Supabase 연결 확인"""
+        """연결 확인"""
         try:
-            # 간단한 쿼리로 연결 테스트
-            self.client.table("dogs").select("id").limit(1).execute()
+            with self._connect() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("SELECT 1")
             return True
         except Exception:
             return False

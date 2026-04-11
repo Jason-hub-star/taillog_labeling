@@ -17,71 +17,34 @@
 
 ---
 
-## 필드 매핑 테이블
+## 필드 매핑 테이블 (실제 스키마 기준 — 2026-04-11 확인)
 
 | taillog_labeling | TailLog behavior_logs | 변환 규칙 | 비고 |
 |-----------------|----------------------|---------|------|
 | `id` (UUID) | — | 매핑 안함 | TailLog가 새 UUID 생성 |
-| `preset_id` (str) | `type_id` (INTEGER) | **OD-02 매핑 테이블 필요** | 미결 |
+| `preset_id` (str) | `behavior_type` (TEXT) | 그대로 | ~~type_id INTEGER 없음~~ |
 | `antecedent` (TEXT) | `antecedent` (TEXT) | 그대로 | |
 | `behavior` (TEXT) | `behavior` (TEXT) | 그대로 | |
 | `consequence` (TEXT) | `consequence` (TEXT) | 그대로 | |
 | `intensity` (1-5) | `intensity` (INTEGER) | 그대로 | |
-| `video_segment_ms[0]` | `occurred_at` (TIMESTAMPTZ) | run.created_at + segment offset | |
+| `frame_id` (INT) | `occurred_at` (TIMESTAMPTZ) | run.created_at + frame_id초 | 1 FPS 기준 |
 | `is_quick_log` | FALSE | 고정값 | ABC 라벨이므로 quick_log 아님 |
-| `dog_id` | **OD-01 필요** | 아래 `dog_id 정책` 참조 | 미결 |
-| `duration` | NULL | Phase 2 이후 추정 | |
+| `dog_id` | `612a3d4f-6fc1-406e-8a15-5430a096eee2` | 고정 UUID | anonymous dog (OD-01 해결) |
 
 ---
 
-## dog_id 정책 (OD-01 미결)
+## dog_id 정책 (OD-01 ✅ 해결 — 2026-04-11)
 
-현재 3가지 옵션 중 **미결정**:
-
-| 옵션 | 방식 | 장단점 |
-|------|------|--------|
-| A | YouTube URL → 사전 정의 `anonymous_sid` 매핑 | 관리 필요, 유연 |
-| B | YouTube 채널별 1개 anonymous dog 자동 할당 | 간단, 채널별 dog |
-| C | 라벨링 시 `dog_id` 수동 지정 | 정확, 수동 작업 |
-
-**임시 처리 (Phase 4 전까지)**: 전용 anonymous dog 1개 생성 (`labeling_pipeline_dog`) 사용
-- Supabase `dogs` 테이블에 `anonymous_sid='labeling_pipeline_v1'` 레코드 생성
-- 모든 YouTube-sourced 라벨은 이 dog에 임시 귀속
+- anonymous dog UUID: `612a3d4f-6fc1-406e-8a15-5430a096eee2`
+- dogs 테이블 name=`labeling_pipeline_v1`, breed=`unknown`
+- 모든 YouTube-sourced 라벨은 이 dog에 귀속 (Phase 4에서 실제 dog 매핑 예정)
 
 ---
 
-## type_id 매핑 (OD-02 미결)
+## behavior_type 매핑 (OD-02 ✅ 해결 — 2026-04-11)
 
-```python
-# 임시 매핑 (Phase 4 전까지)
-# TailLog behavior_logs.type_id 실제 값 확인 후 교체 필요
-PRESET_TO_TYPE_ID = {
-    "walk_pulling": 1,
-    "walk_reactive": 2,
-    "walk_fearful": 3,
-    "walk_distracted": 4,
-    "play_overexcited": 5,
-    "play_resource": 6,
-    "play_rough": 7,
-    "cond_anxious": 8,
-    "cond_destructive": 9,
-    "cond_repetitive": 10,
-    "cond_toileting": 11,
-    "alert_aggression": 12,
-    "alert_barking": 13,
-    "alert_territorial": 14,
-    "meal_guarding": 15,
-    "meal_picky": 16,
-    "meal_stealing": 17,
-    "social_reactive": 18,
-    "social_fearful": 19,
-    "social_dominant": 20,
-    "social_separation": 21,
-    "unknown": None,  # sync 제외
-}
-```
-
-> ⚠️ 이 매핑은 임시값이다. TailLog `behavior_logs.type_id` 실제 ENUM/정수값 확인 후 교체 필수.
+`type_id` INTEGER 컬럼 없음 (실제 스키마 확인). 실제 컬럼은 `behavior_type TEXT`.
+`preset_id` 값을 그대로 `behavior_type`에 삽입. 별도 매핑 불필요.
 
 ---
 

@@ -21,34 +21,8 @@ class SyncWriter:
         "synced": False,
     }
 
-    # OD-02 미결: 임시 preset_id → type_id 매핑
-    PRESET_TO_TYPE_ID = {
-        "walk_pulling": 1,
-        "walk_reactive": 2,
-        "walk_fearful": 3,
-        "walk_distracted": 4,
-        "play_overexcited": 5,
-        "play_resource": 6,
-        "play_rough": 7,
-        "cond_anxious": 8,
-        "cond_destructive": 9,
-        "cond_repetitive": 10,
-        "cond_toileting": 11,
-        "alert_aggression": 12,
-        "alert_barking": 13,
-        "alert_territorial": 14,
-        "meal_guarding": 15,
-        "meal_picky": 16,
-        "meal_stealing": 17,
-        "social_reactive": 18,
-        "social_fearful": 19,
-        "social_dominant": 20,
-        "social_separation": 21,
-        "unknown": None,
-    }
-
-    # OD-01 미결: 임시 anonymous dog
-    ANONYMOUS_DOG_ID = "labeling_pipeline_v1"
+    # OD-01 해결: anonymous dog UUID (dogs 테이블에 생성됨)
+    ANONYMOUS_DOG_ID = "612a3d4f-6fc1-406e-8a15-5430a096eee2"
 
     def __init__(self, retry_count: int = 3):
         self.db = get_db()
@@ -87,10 +61,7 @@ class SyncWriter:
 
         # 4. Supabase 데이터 구성
         preset_id = result["preset_id"]
-        type_id = self.PRESET_TO_TYPE_ID.get(preset_id)
-
-        if type_id is None:
-            # unknown 라벨은 sync 제외
+        if preset_id == "unknown":
             print(f"Unknown 라벨은 sync 제외: {label_id}")
             return False
 
@@ -101,7 +72,7 @@ class SyncWriter:
 
         payload = {
             "dog_id": self.ANONYMOUS_DOG_ID,
-            "type_id": type_id,
+            "behavior_type": preset_id,
             "antecedent": result["antecedent"],
             "behavior": result["behavior"],
             "consequence": result["consequence"],

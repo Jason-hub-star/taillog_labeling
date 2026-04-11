@@ -6,21 +6,13 @@
 
 ## 미결 (주인님 확인 필요)
 
-### OD-01: dog_id 매핑 전략
-- **질문**: YouTube 영상 기반 라벨을 TailLog의 어떤 dog에 귀속시킬까?
-- **옵션**:
-  - A: YouTube URL → 사전 정의 `anonymous_sid` 매핑 파일 관리
-  - B: YouTube 채널 1개 = anonymous dog 1개 자동 할당
-  - C: 라벨링 시 `dog_id` 수동 지정
-- **임시 처리**: `anonymous_sid='labeling_pipeline_v1'` 1개 dog에 모두 귀속
-- **마감**: Phase 4 전
-- **담당**: 주인님
+### ~~OD-01: dog_id 매핑 전략~~ ✅ RESOLVED
+- **결정**: anonymous dog UUID `612a3d4f-6fc1-406e-8a15-5430a096eee2` 사용 (dogs 테이블에 생성)
+- **해결일**: 2026-04-11
 
 ### ~~OD-02: type_id INTEGER 매핑~~ ✅ RESOLVED
-- **결정**: `behavior_logs.type_id` = FK 없는 순수 `INTEGER` (Column(Integer), 제약 없음)
-- **매핑**: `PRESET_TO_TYPE_ID` 딕셔너리 (1~21 순서 매핑) 그대로 사용
-- **위치**: `SUPABASE-SYNC-CONTRACT.md` 임시 매핑 → **확정 매핑으로 승격**
-- **해결일**: 2026-04-11
+- **결정**: `type_id` 컬럼 없음. 실제 컬럼은 `behavior_type TEXT`. `preset_id` 그대로 사용.
+- **해결일**: 2026-04-11 (실제 Supabase 스키마 직접 확인)
 
 ### OD-03: 모바일 앱 플랫폼 선택
 - **질문**: React Native vs Flutter?
