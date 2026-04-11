@@ -51,7 +51,8 @@
   "intensity": 4,
   "confidence": 0.87,
   "pose_keypoints": [
-    {"x": 0.45, "y": 0.32, "c": 0.91},
+    {"bodypart": "nose",      "x": 0.45, "y": 0.32, "c": 0.91},
+    {"bodypart": "left_ear",  "x": 0.41, "y": 0.29, "c": 0.85},
     ...
   ],
   "video_segment_ms": [1200, 3400],
@@ -91,7 +92,7 @@
 ## TailLog behavior_logs 매핑
 
 ```
-behavior_labels.preset_id → behavior_logs.type_id (INTEGER 매핑 — OD-02 미결)
+behavior_labels.preset_id → behavior_logs.behavior_type (TEXT) ← OD-02 확정
 behavior_labels.antecedent → behavior_logs.antecedent (TEXT)
 behavior_labels.behavior → behavior_logs.behavior (TEXT)
 behavior_labels.consequence → behavior_logs.consequence (TEXT)
@@ -99,5 +100,4 @@ behavior_labels.intensity → behavior_logs.intensity (INTEGER 1-5)
 behavior_labels.run_id.created_at → behavior_logs.occurred_at (TIMESTAMPTZ)
 ```
 
-> **OD-02 미결**: `preset_id` (문자열) → `type_id` (INTEGER) 변환 테이블 미정.
-> `docs/ref/OPEN-DECISIONS.md` 참조.
+> **OD-02 ✅ 확정**: `type_id` INTEGER 없음. 실제 컬럼은 `behavior_type TEXT`. preset_id 그대로 삽입.

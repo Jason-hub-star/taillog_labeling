@@ -47,6 +47,28 @@
 - **좌우 위치**: 프레임 내 좌/우 절대 위치는 행동 분류와 무관 → 정규화 OK
 - **Phase 3 이후 검토**: Procrustes Alignment (강아지 중심축 기준 keypoint 정렬)
 
+### A-07. Keypoint JSON 저장 포맷 ✅ 확정 (2026-04-11)
+- **결정**: bodypart 이름 포함 저장 (Option A)
+- **이유**: 인덱스만 저장하면 "어떤 인덱스가 어떤 부위인지" 별도 문서 참조 필요 → 디버깅·필터링 불가
+- **포맷**:
+  ```json
+  [
+    {"bodypart": "nose",       "x": 123.4, "y": 456.7, "c": 0.91},
+    {"bodypart": "left_ear",   "x": 110.2, "y": 440.1, "c": 0.85},
+    {"bodypart": "right_ear",  "x": 135.6, "y": 441.3, "c": 0.88},
+    ...
+  ]
+  ```
+- **bodypart 이름**: SuperAnimal-Quadruped H5 출력의 MultiIndex 컬럼 level_1 그대로 사용
+  - 실제 이름 목록은 최초 추론 실행 시 `run_superanimal.py` 출력에서 확인
+  - 39개 bodypart (nose, eyes, ears, spine, tail, 4×3 limbs 등)
+- **저장 대상**: `pose_results.keypoints_json` (SQLite TEXT)
+- **1 FPS 샘플링 위치**: `pose_extractor.py` 에서 H5 전체 프레임 중 `frame_id % fps == 0` 필터
+- **subprocess 인터페이스**:
+  - 입력: `video_path`, `output_json_path`
+  - 출력: `[{"bodypart": ..., "x": ..., "y": ..., "c": ...}, ...]` JSON 파일
+  - 호출: `.venv_dlc/bin/python scripts/compare/run_superanimal.py --video ... --output ...`
+
 ### A-02. LLM 역할 분담
 | 에이전트 | 모델 | 이유 |
 |---------|------|------|

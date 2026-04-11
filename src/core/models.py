@@ -36,10 +36,11 @@ class BatchResult(Generic[T]):
 
 
 class KeyPoint(BaseModel):
-    """단일 키포인트 (x, y, confidence)"""
-    x: float
+    """단일 키포인트 — A-07 확정: bodypart 이름 포함 저장"""
+    bodypart: str  # SuperAnimal bodypart 이름 (nose, left_ear, ...)
+    x: float       # 절대 픽셀 좌표 (A-06)
     y: float
-    c: float  # confidence
+    c: float       # confidence (likelihood)
 
 
 class PoseResult(BaseModel):
@@ -47,7 +48,7 @@ class PoseResult(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     run_id: str
     frame_id: int
-    keypoints: List[KeyPoint]  # YOLOv8n 17개 keypoints
+    keypoints: List[KeyPoint]  # SuperAnimal quadruped 39개 keypoints (bodypart 이름 포함 — A-07)
     confidence: float  # 탐지 신뢰도 (0~1)
     created_at: datetime = Field(default_factory=datetime.utcnow)
 

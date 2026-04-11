@@ -21,11 +21,9 @@
 - **마감**: Phase 4 후 (파이프라인과 무관)
 - **담당**: 주인님
 
-### OD-04: Telegram 알림 봇 설정
-- **질문**: watchdog 알림용 Telegram 봇 토큰 및 채팅 ID
-- **임시 처리**: 로컬 파일 로그 (`data/exports/sync_logs/watchdog.log`)
-- **마감**: Phase 1 완료 후
-- **담당**: 주인님 (봇 토큰 제공)
+### ~~OD-04: Telegram 알림 봇 설정~~ ✅ RESOLVED
+- **결정**: `@TailLog_Watchdog_bot` 생성, token + chat_id `.env.local` 등록 완료
+- **해결일**: 2026-04-11
 
 ### OD-05: Cohen's Kappa 목표치
 - **질문**: human_review 검수자 간 일관성 목표 설정
