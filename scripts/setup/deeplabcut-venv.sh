@@ -43,35 +43,103 @@ else
     echo "  ✅ venv 생성 완료"
 fi
 
-# ── Step 3: pip 업그레이드 ────────────────────────────────────────────────
+# ── Step 3: pip + setuptools 업그레이드 ──────────────────────────────────
 echo ""
-echo "[3/5] pip 업그레이드..."
-"$VENV_DIR/bin/pip" install --upgrade pip --quiet
-echo "  ✅ pip $(\"$VENV_DIR/bin/pip\" --version | awk '{print $2}')"
+echo "[3/5] pip + setuptools 설정..."
+"$VENV_DIR/bin/python" -m pip install --upgrade pip --quiet
+# setuptools<67: pkg_resources가 빌드 격리 환경에서도 동작하는 마지막 버전
+"$VENV_DIR/bin/python" -m pip install "setuptools<67" wheel --quiet
+PIP_VER=$("$VENV_DIR/bin/python" -m pip --version | awk '{print $2}')
+echo "  ✅ pip $PIP_VER (setuptools<67 고정)"
 
 # ── Step 4: deeplabcut 의존성 설치 ────────────────────────────────────────
 echo ""
 echo "[4/5] deeplabcut 설치 (수 분 소요)..."
 
+PY="$VENV_DIR/bin/python"
+
 # numpy<2.0 먼저 (tables 빌드 요구)
-"$VENV_DIR/bin/pip" install "numpy<2.0" --quiet
+"$PY" -m pip install "numpy<2.0" --quiet
 echo "  numpy 완료"
 
-# tables 명시적 버전 (deeplabcut 필요)
-"$VENV_DIR/bin/pip" install "tables==3.8.0" --quiet
-echo "  tables 완료"
+# tables — --no-build-isolation으로 바이너리 wheel 사용
+echo "  tables 설치 시도..."
+if "$PY" -m pip install tables --no-build-isolation --quiet; then
+    echo "  tables 완료"
+else
+    echo "  ❌ tables 설치 실패"
+    exit 1
+fi
 
-# deeplabcut modelzoo 포함 설치
-"$VENV_DIR/bin/pip" install "deeplabcut[modelzoo]" --quiet
-echo "  deeplabcut 완료"
+# tables 버전 고정 (이미 설치된 버전으로 deeplabcut이 다운그레이드 못 하도록)
+TABLES_VER=$("$PY" -c "import tables; print(tables.__version__)")
+echo "tables>=$TABLES_VER" > /tmp/dlc_constraints.txt
+echo "  tables 버전 고정: $TABLES_VER"
+
+# deeplabcut 설치 (modelzoo extras 포함)
+echo "  deeplabcut 설치 중 (수 분 소요)..."
+if "$PY" -m pip install "deeplabcut[modelzoo]" \
+    --constraint /tmp/dlc_constraints.txt --quiet 2>/dev/null; then
+    echo "  deeplabcut[modelzoo] 완료"
+elif "$PY" -m pip install "deeplabcut" \
+    --constraint /tmp/dlc_constraints.txt --quiet; then
+    echo "  deeplabcut (base) 완료"
+else
+    echo "  ❌ deeplabcut 설치 실패"
+    exit 1
+fi
 
 # dlclibrary (HuggingFace 모델 다운로드용)
-"$VENV_DIR/bin/pip" install dlclibrary --quiet
+"$PY" -m pip install dlclibrary --quiet
 echo "  dlclibrary 완료"
 
 # pandas (H5 파싱용)
-"$VENV_DIR/bin/pip" install pandas --quiet
+"$PY" -m pip install pandas --quiet
 echo "  pandas 완료"
+
+# ── Step 4b: DLC __init__ TF 패치 (PyTorch-only 환경) ────────────────────
+echo ""
+echo "[4b/5] deeplabcut TF 패치 적용..."
+
+DLC_INIT="$VENV_DIR/lib/$(ls "$VENV_DIR/lib/")/site-packages/deeplabcut/__init__.py"
+DLC_TF_INIT="$VENV_DIR/lib/$(ls "$VENV_DIR/lib/")/site-packages/deeplabcut/pose_estimation_tensorflow/__init__.py"
+
+# __init__.py: import tensorflow → try/except
+python3 - "$DLC_INIT" <<'PYEOF'
+import sys, re
+path = sys.argv[1]
+with open(path) as f:
+    src = f.read()
+old = "import tensorflow as tf\n\ntf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)"
+new = "try:\n    import tensorflow as tf\n    tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)\nexcept ImportError:\n    tf = None"
+if old in src:
+    with open(path, 'w') as f:
+        f.write(src.replace(old, new))
+    print("  ✅ __init__.py TF 패치 완료")
+else:
+    print("  ⚠️  __init__.py 이미 패치됨 (또는 변경됨)")
+PYEOF
+
+# pose_estimation_tensorflow/__init__.py: 전체 import → try/except
+python3 - "$DLC_TF_INIT" <<'PYEOF'
+import sys
+path = sys.argv[1]
+with open(path) as f:
+    src = f.read()
+if 'try:' not in src:
+    wrapped = "# TF-dependent submodules — wrapped for PyTorch-only environments\ntry:\n"
+    for line in src.split('\n'):
+        if line.startswith('from deeplabcut'):
+            wrapped += "    " + line + "\n"
+        else:
+            wrapped += line + "\n"
+    wrapped += "except (ImportError, ModuleNotFoundError, AttributeError):\n    pass\n"
+    with open(path, 'w') as f:
+        f.write(wrapped)
+    print("  ✅ pose_estimation_tensorflow/__init__.py TF 패치 완료")
+else:
+    print("  ⚠️  pose_estimation_tensorflow/__init__.py 이미 패치됨")
+PYEOF
 
 # ── Step 5: 설치 검증 ─────────────────────────────────────────────────────
 echo ""
