@@ -2,6 +2,8 @@
 
 import json
 import os
+import urllib.request
+import urllib.parse
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
@@ -15,6 +17,19 @@ class Watchdog:
 
     def __init__(self):
         Path(self.LOG_DIR).mkdir(parents=True, exist_ok=True)
+        self._tg_token = os.getenv("TELEGRAM_BOT_TOKEN")
+        self._tg_chat_id = os.getenv("TELEGRAM_CHAT_ID")
+
+    def _notify(self, text: str):
+        """Telegram 알림 전송 (실패해도 파이프라인 중단 안 함)"""
+        if not self._tg_token or not self._tg_chat_id:
+            return
+        try:
+            params = urllib.parse.urlencode({"chat_id": self._tg_chat_id, "text": text})
+            url = f"https://api.telegram.org/bot{self._tg_token}/sendMessage?{params}"
+            urllib.request.urlopen(url, timeout=5)
+        except Exception:
+            pass
 
     def log_failure(
         self,
@@ -47,7 +62,7 @@ class Watchdog:
         with open(log_file, "a") as f:
             f.write(json.dumps(log_entry) + "\n")
 
-        # HALT 조건 시 별도 파일
+        # HALT 조건 시 별도 파일 + Telegram 알림
         if is_halt:
             halt_file = os.path.join(
                 self.LOG_DIR,
@@ -56,6 +71,9 @@ class Watchdog:
             with open(halt_file, "w") as f:
                 f.write(json.dumps(log_entry, indent=2))
             print(f"\n⚠️ HALT 조건 발생: {halt_file}")
+            self._notify(f"🚨 HALT [{agent}]\n{error_msg}")
+        elif error_type == "permanent":
+            self._notify(f"❌ 영구오류 [{agent}]\n{error_msg[:200]}")
 
     def classify_failure(self, error_msg: str) -> Tuple[str, bool]:
         """
