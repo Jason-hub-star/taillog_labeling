@@ -70,6 +70,57 @@ class OllamaClient:
                 # 버그성 오류(ValueError, RuntimeError 등)는 재시도 없이 즉시 전파
                 raise
 
+    def generate_with_image(
+        self,
+        model: str,
+        prompt: str,
+        image_base64: str,
+        temperature: float = 0.3,
+        retry_count: int = 3,
+    ) -> Dict[str, Any]:
+        """
+        Vision LLM 호출 — 이미지 + 프롬프트 (Ollama /api/generate)
+
+        Args:
+            model: Vision 지원 모델명 (gemma4:26b-a4b-it-q4_K_M)
+            prompt: 텍스트 프롬프트
+            image_base64: base64 인코딩된 JPEG 문자열
+            temperature: 0~2 (분류 작업은 0.3 권장)
+            retry_count: 일시적 오류 재시도 횟수
+
+        Returns:
+            {"content": "...", "stop_reason": "stop", "model": "..."}
+        """
+        if ollama is None:
+            raise RuntimeError("ollama 패키지 필요: pip install ollama")
+
+        _TRANSIENT = (ConnectionError, TimeoutError, OSError)
+
+        for attempt in range(retry_count):
+            try:
+                response = ollama.generate(
+                    model=model,
+                    prompt=prompt,
+                    images=[image_base64],
+                    stream=False,
+                    options={"temperature": temperature},
+                )
+                return {
+                    "content": response.get("response", ""),
+                    "stop_reason": response.get("done_reason", "stop"),
+                    "model": model,
+                }
+            except _TRANSIENT as e:
+                if attempt < retry_count - 1:
+                    backoff_seconds = 2 ** attempt + random.uniform(0, 1)
+                    time.sleep(backoff_seconds)
+                else:
+                    raise RuntimeError(
+                        f"Vision LLM failed after {retry_count} retries: {str(e)}"
+                    ) from e
+            except Exception:
+                raise
+
     def parse_json_response(self, content: str) -> Dict[str, Any]:
         """LLM 응답을 JSON으로 파싱"""
         try:

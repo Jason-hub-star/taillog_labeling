@@ -58,7 +58,7 @@ class Orchestrator:
 
             # Stage 2: Extract Pose
             print(f"\n[Stage 2] Extracting pose: {run.video_path}")
-            pose_success = self.pose_extractor.run(run.video_path, run_id, dry_run)
+            pose_success, pose_result_objs = self.pose_extractor.run(run.video_path, run_id, dry_run)
             if not pose_success:
                 self.watchdog.log_failure("pose_extractor", run_id, "transient", "포즈 추출 실패")
                 if not dry_run:
@@ -68,44 +68,52 @@ class Orchestrator:
                     )
                 return None
 
-            # pose_results 조회
-            pose_results = self.db.execute(
-                "SELECT id, frame_id, keypoints_json FROM pose_results WHERE run_id = ? ORDER BY frame_id",
-                (run_id,),
-            )
-            print(f"✓ Extracted {len(pose_results)} frames")
+            print(f"✓ Extracted {len(pose_result_objs)} frames")
 
             # Stage 3: Classify & Label
+            # pose_result_objs: List[PoseResult] — dry_run 시 DB 저장 없으므로 메모리 직접 사용
             print(f"\n[Stage 3] Classifying and labeling")
             classified_count = 0
-            for pose_result in pose_results:
+            for pr in pose_result_objs:
+                keypoints_json = json.dumps(
+                    [{"bodypart": kp.bodypart, "x": kp.x, "y": kp.y, "c": kp.c}
+                     for kp in pr.keypoints]
+                )
                 label = self.behavior_classifier.run(
                     run_id,
-                    pose_result["frame_id"],  # pose_result UUID가 아닌 frame_id 전달
-                    pose_result["keypoints_json"],
+                    pr.frame_id,
+                    keypoints_json,
+                    frame_path=pr.frame_path,
                     dry_run=dry_run,
                 )
                 if label:
                     classified_count += 1
 
-                    # Stage 4: ABC Labeler
-                    abc_success = self.abc_labeler.run(label.id, dry_run)
-                    if not abc_success:
-                        self.watchdog.log_failure(
-                            "abc_labeler",
-                            label.id,
-                            "transient",
-                            "ABC 생성 실패",
+                    if dry_run:
+                        # dry_run: DB 미저장이므로 abc_labeler/critic 스킵
+                        print(
+                            f"  Frame {pr.frame_id}: {label.category}/{label.label} "
+                            f"(conf={label.confidence:.2f}, dry_run=skip_abc_critic)"
+                        )
+                    else:
+                        # Stage 4: ABC Labeler
+                        abc_success = self.abc_labeler.run(label.id, dry_run)
+                        if not abc_success:
+                            self.watchdog.log_failure(
+                                "abc_labeler",
+                                label.id,
+                                "transient",
+                                "ABC 생성 실패",
+                            )
+
+                        # Stage 5: Critic
+                        critic_pass = self.critic.run(label.id, dry_run)
+                        print(
+                            f"  Frame {pr.frame_id}: {label.category}/{label.label} "
+                            f"(conf={label.confidence:.2f}, critic={'PASS' if critic_pass else 'FAIL'})"
                         )
 
-                    # Stage 5: Critic
-                    critic_pass = self.critic.run(label.id, dry_run)
-                    print(
-                        f"  Frame {pose_result['frame_id']}: {label.category}/{label.label} "
-                        f"(conf={label.confidence:.2f}, critic={'PASS' if critic_pass else 'FAIL'})"
-                    )
-
-            print(f"✓ Classified {classified_count}/{len(pose_results)} frames")
+            print(f"✓ Classified {classified_count}/{len(pose_result_objs)} frames")
 
             # Stage 6: Quality Gate
             print(f"\n[Stage 4] Quality Gate")

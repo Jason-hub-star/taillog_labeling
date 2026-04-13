@@ -348,3 +348,158 @@ def test_confidence_thresholds(db, sample_run_id, confidence, expected_status):
     assert result["review_status"] == expected_status, (
         f"confidence={confidence} → 기대: {expected_status}, 실제: {result['review_status']}"
     )
+
+
+# ──────────────────────────────────────────────────────────
+# BehaviorClassifier 테스트 — LLM mock
+# ──────────────────────────────────────────────────────────
+
+class TestBehaviorClassifier:
+    """BehaviorClassifier: LLM mock으로 분류 로직 검증"""
+
+    # SuperAnimal 39pt 샘플 (bodypart 필드 포함)
+    SAMPLE_KEYPOINTS = json.dumps([
+        {"bodypart": "nose", "x": 320, "y": 240, "c": 0.92},
+        {"bodypart": "left_ear", "x": 290, "y": 210, "c": 0.88},
+        {"bodypart": "right_ear", "x": 350, "y": 210, "c": 0.85},
+        {"bodypart": "withers", "x": 310, "y": 280, "c": 0.75},
+        {"bodypart": "tail_base", "x": 300, "y": 380, "c": 0.20},  # 0.3 미만 → 필터됨
+    ])
+
+    def _make_classifier(self, db, mock_llm):
+        with patch("src.agents.behavior_classifier.get_db", return_value=db):
+            with patch("src.agents.behavior_classifier.get_ollama_client", return_value=mock_llm):
+                return BehaviorClassifier()
+
+    def test_classify_success(self, db, sample_run_id):
+        """Vision LLM 정상 응답 → BehaviorLabel 반환, DB 저장"""
+        from src.agents.behavior_classifier import BehaviorClassifier
+
+        mock_llm = MagicMock()
+        mock_llm.generate_with_image.return_value = {
+            "content": '{"category": "walk", "preset_id": "walk_pulling", "confidence": 0.88, "reasoning": "Leash is visibly taut."}'
+        }
+        mock_llm.parse_json_response.return_value = {
+            "category": "walk",
+            "preset_id": "walk_pulling",
+            "confidence": 0.88,
+            "reasoning": "Leash is visibly taut.",
+        }
+
+        with patch("src.agents.behavior_classifier.get_db", return_value=db):
+            with patch("src.agents.behavior_classifier.get_ollama_client", return_value=mock_llm):
+                with patch("src.agents.behavior_classifier.load_frame_image", return_value=b"fake-jpeg"):
+                    with patch("src.agents.behavior_classifier.image_to_base64", return_value="base64str"):
+                        classifier = BehaviorClassifier()
+                        result = classifier.run(
+                            run_id=sample_run_id,
+                            frame_id=1,
+                            keypoints_json=self.SAMPLE_KEYPOINTS,
+                            frame_path="/fake/frame/000001.jpg",
+                            dry_run=False,
+                        )
+
+        assert result is not None
+        assert result.category == "walk"
+        assert result.label == "walk_pulling"
+        assert result.review_status == "pending"
+        assert 0.0 < result.confidence <= 1.0
+
+        # DB 저장 확인
+        row = db.execute_one("SELECT label, review_status FROM behavior_labels WHERE id = ?", (result.id,))
+        assert row is not None
+        assert row["label"] == "walk_pulling"
+
+    def test_classify_llm_parse_error_returns_unknown(self, db, sample_run_id):
+        """Vision LLM 파싱 실패 → unknown/0.3 기본값, DB 저장"""
+        from src.agents.behavior_classifier import BehaviorClassifier
+
+        mock_llm = MagicMock()
+        mock_llm.generate_with_image.side_effect = ValueError("JSON 파싱 실패")
+
+        with patch("src.agents.behavior_classifier.get_db", return_value=db):
+            with patch("src.agents.behavior_classifier.get_ollama_client", return_value=mock_llm):
+                with patch("src.agents.behavior_classifier.load_frame_image", return_value=b"fake-jpeg"):
+                    with patch("src.agents.behavior_classifier.image_to_base64", return_value="base64str"):
+                        classifier = BehaviorClassifier()
+                        result = classifier.run(
+                            run_id=sample_run_id,
+                            frame_id=2,
+                            keypoints_json=self.SAMPLE_KEYPOINTS,
+                            frame_path="/fake/frame/000002.jpg",
+                            dry_run=False,
+                        )
+
+        assert result is not None
+        assert result.label == "unknown"
+        assert result.llm_confidence == 0.3
+
+    def test_classify_timeout_returns_unknown(self, db, sample_run_id):
+        """Vision LLM 타임아웃 → unknown/0.3, 크래시 없음"""
+        from src.agents.behavior_classifier import BehaviorClassifier
+
+        mock_llm = MagicMock()
+        mock_llm.generate_with_image.side_effect = TimeoutError("Ollama 응답 타임아웃")
+
+        with patch("src.agents.behavior_classifier.get_db", return_value=db):
+            with patch("src.agents.behavior_classifier.get_ollama_client", return_value=mock_llm):
+                with patch("src.agents.behavior_classifier.load_frame_image", return_value=b"fake-jpeg"):
+                    with patch("src.agents.behavior_classifier.image_to_base64", return_value="base64str"):
+                        classifier = BehaviorClassifier()
+                        result = classifier.run(
+                            run_id=sample_run_id,
+                            frame_id=3,
+                            keypoints_json=self.SAMPLE_KEYPOINTS,
+                            frame_path="/fake/frame/000003.jpg",
+                            dry_run=True,
+                        )
+
+        assert result is not None
+        assert result.label == "unknown"
+        assert result.review_status == "pending"
+
+    def test_classify_invalid_keypoints_json(self, db, sample_run_id):
+        """keypoints_json 파싱 불가 → keypoints_quality=0.3으로 graceful 처리, frame 없으면 unknown 반환"""
+        from src.agents.behavior_classifier import BehaviorClassifier
+
+        mock_llm = MagicMock()
+
+        with patch("src.agents.behavior_classifier.get_db", return_value=db):
+            with patch("src.agents.behavior_classifier.get_ollama_client", return_value=mock_llm):
+                classifier = BehaviorClassifier()
+                result = classifier.run(
+                    run_id=sample_run_id,
+                    frame_id=4,
+                    keypoints_json="not-valid-json",
+                    frame_path=None,  # frame 없음 → unknown
+                    dry_run=True,
+                )
+
+        # frame_path 없음 → unknown BehaviorLabel (graceful fallback)
+        assert result is not None
+        assert result.label == "unknown"
+        assert result.llm_confidence == 0.3
+
+    def test_keypoint_quality_low_confidence_filtered(self):
+        """confidence 0.3 미만 keypoint는 텍스트에서 제외"""
+        from src.prompts.classifier_prompt import keypoints_to_text
+
+        kps = [
+            {"bodypart": "nose", "x": 100, "y": 200, "c": 0.90},
+            {"bodypart": "tail_base", "x": 100, "y": 300, "c": 0.10},  # 제외 대상
+        ]
+        text = keypoints_to_text(kps)
+
+        assert "nose" in text
+        assert "tail_base" not in text
+
+    def test_keypoint_quality_all_filtered_returns_message(self):
+        """전체 keypoint confidence 0.3 미만 → 안내 메시지"""
+        from src.prompts.classifier_prompt import keypoints_to_text
+
+        kps = [
+            {"bodypart": "nose", "x": 100, "y": 200, "c": 0.05},
+            {"bodypart": "left_ear", "x": 90, "y": 180, "c": 0.10},
+        ]
+        text = keypoints_to_text(kps)
+        assert "키포인트 정보 없음" in text

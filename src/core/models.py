@@ -52,6 +52,7 @@ class PoseResult(BaseModel):
     frame_id: int
     keypoints: List[KeyPoint]  # SuperAnimal quadruped 39개 keypoints (bodypart 이름 포함 — A-07)
     confidence: float  # 탐지 신뢰도 (0~1)
+    frame_path: Optional[str] = None  # A-09: 프레임 이미지 JPEG 절대 경로
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
@@ -118,6 +119,7 @@ class ClassifierOutput(BaseModel):
     category: str
     label: str
     confidence: float = 0.6  # 제공 안 되면 0.6
+    reasoning: Optional[str] = None  # Vision LLM 근거 → reviewer_note에 [AI] prefix로 저장
 
 
 class ABCLabelerOutput(BaseModel):
