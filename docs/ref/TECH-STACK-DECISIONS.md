@@ -15,10 +15,55 @@
   - SuperAnimal-Quadruped Zero-shot mAP **84.6** (Nature Comm. 2024)
 - **keypoint 포맷**: SuperAnimal quadruped (39-point) — COCO 17pt 아님
 - **conf 임계값**: 0.3 (SuperAnimal 기준, 추후 교정)
-- **설치 요건**: deeplabcut + Python 3.10 또는 3.11 가상환경 필요 (Python 3.14 미호환)
+- **설치 요건**: deeplabcut **2.3.11** + Python 3.11 가상환경 필요 (Python 3.14 미호환)
+  - `deeplabcut 2.3.11`: tables>=3.7.0 wheel 패치 필요 (기본 wheel은 tables==3.8.0으로 M1 빌드 불가)
+  - `tensorflow 2.21.0` + `tf-keras 2.21.0` 필수 (Keras 3 단독 설치 시 compat.v1.layers 충돌)
+  - `keras` 3.x 패키지는 **유지 필수** (제거 시 TF 2.21 lazy loader RecursionError 발생)
+  - `tf_keras/legacy_tf_layers` 심링크 필요 (TF 2.21 경로 불일치 해결)
+  - 설정 자동화: `bash scripts/setup/deeplabcut-venv.sh` (패치 포함)
 - **공통 확정 항목**:
   - 프레임 추출 속도: `1 FPS`
-  - 배치 크기: 기본 16, GPU 메모리 <4GB 시 8로 fallback
+  - 배치 크기: 기본 16 (DLC `video_inference_superanimal` API가 batch_size 파라미터 미지원 — 외부 제어 불가)
+
+### A-08. 추론 디바이스 전략 ⛔ 보류 (2026-04-12 검증 결과)
+- **현재 상태**: **CPU 단일 모드 유지** — tensorflow-metal 설치 불가 확인
+- **보류 사유**: `tensorflow-metal 1.2.0` 설치 시 TF 2.21 `import` 파괴 (`libmetal_plugin.dylib` 경로 불일치)
+  - `pip uninstall tensorflow-metal` 후 즉시 복구 확인 (check_env.py 16/16 통과)
+- **재검토 조건**: tensorflow-metal이 TF 2.21+ 공식 지원 출시 시 또는 DLC 3.0 (PyTorch) 전환 시
+- **원설계 (참고용)**:
+  - `auto` 모드: GPU 우선 → `ResourceExhaustedError` / `MemoryError` 시 CPU 폴백
+  - `superanimal_infer.py --device [auto|gpu|cpu]` 인터페이스
+  - ~~`TF_METAL_DEVICE_MASK`~~ — 비공식 환경변수, 사용 금지
+- ~~배치 크기 연동~~: `video_inference_superanimal()` 시그니처에 `batch_size` 파라미터 없음 → 삭제
+
+### A-09. YOLOv8 학습 데이터 저장 전략 ✅ 확정 (2026-04-12)
+
+- **결정**: 포즈 추출 시점에 프레임 이미지 + YOLO 39pt 라벨 저장 (부가 출력)
+- **저장 경로**: `data/training/frames/` (JPEG), `data/training/labels/39pt/` (.txt)
+- **포맷**: YOLO pose format — `class_id cx cy w h [kpx kpy kpv] × 39`
+  - bbox: confidence ≥ 0.3 keypoint 외접 사각형 (Convex Hull)
+  - 좌표: 정규화 (0~1), visibility: 0/1
+  - bodypart 순서: H5 MultiIndex 추출 순서 그대로 (하드코딩 금지)
+- **Phase 전략**:
+  - Phase 1~3: **39pt 그대로 저장** (`kpt_shape: [39, 2]`)
+  - Phase 3 후반 (500건 도달): `sa_to_dogpose24.py` 개발 → 24pt 변환
+  - Phase 4: Dog-Pose 공개 24pt (6,773장) + 자체 변환 24pt 병합
+- **설계 원칙**: 학습 데이터 저장은 부가 출력 — 실패해도 파이프라인 계속 진행
+- **영상 삭제 정책**: 14일 삭제 유지 — 프레임만 별도 보존
+- **변경 파일**: `config.py`, `superanimal_infer.py`, `pose_extractor.py`
+- **신규 파일**: `scripts/train/generate_dataset_yaml.py`
+
+### ❌ A-08 검증 결과 — 보류 확정 (2026-04-12)
+
+| 항목 | 결과 | 근거 |
+|------|------|------|
+| **tensorflow-metal 1.2.0 × TF 2.21** | **호환 불가** | 설치 즉시 TF import 파괴 — `libmetal_plugin.dylib`가 존재하지 않는 `_solib_darwin_arm64/` 경로 참조. 공식 호환 목록 TF 2.18까지 |
+| **Metal × DLC V1 네트워크** | 검증 불가 | TF import 자체 실패로 GPU 감지 단계 도달 불가 |
+
+- **검증 스크립트 실행**: `check_gpu_feasibility.py --install` (2026-04-12)
+- **즉각 복구**: `pip uninstall tensorflow-metal` → TF 2.21.0 정상 복구 확인
+- **결론: A-08 전체 보류** — CPU 단일 모드 유지 (현 상태)
+- **재검토 조건**: tensorflow-metal가 TF 2.21 이상을 공식 지원하는 버전 출시 시
 
 ### A-05. 다중 강아지 추적 전략
 - **추적 알고리즘**: `BoT-SORT` 확정 (ByteTrack 대비 가려짐·조명 불안정 상황에서 우수)
@@ -65,22 +110,40 @@
 - **저장 대상**: `pose_results.keypoints_json` (SQLite TEXT)
 - **1 FPS 샘플링 위치**: `pose_extractor.py` 에서 H5 전체 프레임 중 `frame_id % fps == 0` 필터
 - **subprocess 인터페이스**:
-  - 입력: `video_path`, `output_json_path`
+  - 진입점: `scripts/superanimal_infer.py` (파이프라인 전용 — 배치 비교용 `scripts/compare/run_superanimal.py`와 분리)
+  - 입력: `--video <path>` `--output <json_path>`
   - 출력: `[{"bodypart": ..., "x": ..., "y": ..., "c": ...}, ...]` JSON 파일
-  - 호출: `.venv_dlc/bin/python scripts/compare/run_superanimal.py --video ... --output ...`
+  - 호출: `Config.DLC_VENV_PYTHON scripts/superanimal_infer.py --video ... --output ...`
+  - 확장성: 향후 SLEAP/MMPose 교체 시 `Config.SUPERANIMAL_INFER_SCRIPT` 경로 교체만으로 대응
+  - 경로 상수: `Config.SUPERANIMAL_INFER_SCRIPT`, `Config.DLC_VENV_PYTHON` (하드코딩 금지)
 
-### A-02. LLM 역할 분담
-| 에이전트 | 모델 | 이유 |
-|---------|------|------|
-| behavior_classifier | `gemma4-unsloth-e4b:latest` (5GB) | 속도 우선, 분류 반복 작업 |
-| abc_labeler | `gemma4-unsloth-e4b:latest` (5GB) | 속도 우선, 구조화 반복 |
-| critic | `gemma4:26b-a4b-it-q4_K_M` (17GB) | 정확도 우선, 최종 검수 |
-| watchdog | rule engine (Python) | deterministic, LLM 없음 |
-| sync_writer | rule engine (Python) | deterministic, LLM 없음 |
+### A-02. LLM 역할 분담 (2026-04-12 재설계)
+
+| 에이전트 | 모델 | 입력 | 이유 |
+|---------|------|------|------|
+| behavior_classifier | `gemma4:26b-a4b-it-q4_K_M` (17GB, **Vision**) | **프레임 이미지 (JPEG)** | ~~keypoints JSON~~ → 이미지 직접 분류 (zero-shot Vision) |
+| abc_labeler | `gemma4-unsloth-e4b:latest` (5GB) | label + context | 속도 우선, 구조화 반복 |
+| critic | `gemma4:26b-a4b-it-q4_K_M` (17GB) | ABC + confidence | 정확도 우선, 최종 검수 |
+| watchdog | rule engine (Python) | logs | deterministic, LLM 없음 |
+| sync_writer | rule engine (Python) | approved labels | deterministic, LLM 없음 |
 
 - **Ollama 엔드포인트**: `http://localhost:11434`
 - **모델 이름 (정확한 tag)**: `gemma4-unsloth-e4b:latest`, `gemma4:26b-a4b-it-q4_K_M`
 - **shadow mode 초기**: critic은 `gemma4:26b`로 시작. 데이터 200건 누적 후 promote 여부 평가
+- **분류 방식 전환 근거**: dry_run 검증 결과 keypoints 좌표 기반 분류 100% unknown — 구조적 한계 확인 (2026-04-12)
+
+### A-10. Vision LLM 행동 분류 전략 ✅ 확정 (2026-04-12)
+
+- **결정**: behavior_classifier 입력을 keypoints JSON → **프레임 이미지 (JPEG)** 로 전환
+- **모델**: `gemma4:26b-a4b-it-q4_K_M` — Ollama 로컬, 멀티모달 Vision 지원
+- **Phase 전략**:
+  - **Phase 1 (M1, ~100건)**: 단일 프레임 이미지 zero-shot, cold start 100건 전수 검수
+  - **Phase 2 (M2, ~500건)**: 5프레임 콜라주 + few-shot (confidence threshold 자동 승인 활성화)
+  - **Phase 3+ (M4, ~3000건)**: 파인튜닝 검토 (LoRA/QLoRA, gemma-tuner-multimodal 참고)
+- **처리 시간 (M1 기준)**: 1건당 12초 (이미지 인코딩 3초 + 추론 ~9초)
+- **전체 파이프라인 1건**: 포즈 추출 7분 + 분류 84분 = **~90분/영상**
+- **인간 검수 UI**: Streamlit (`scripts/review/review_app.py`) — 이미지 + 맞음/틀림/수정/메모
+- **파인튜닝 보류 조건**: 라벨 데이터 3,000건 + Cohen's Kappa ≥ 0.80 확인 후 재검토
 
 ### A-03. 라벨 출력 포맷 (B-03)
 - **기반**: TaillogToss `presets.ts` (6 categories × 21 behaviors)

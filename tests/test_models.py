@@ -6,7 +6,8 @@ from src.core.models import KeyPoint, PoseResult, BehaviorLabel, LabelingRun
 
 def test_keypoint_creation():
     """KeyPoint 생성"""
-    kp = KeyPoint(x=0.5, y=0.5, c=0.9)
+    kp = KeyPoint(bodypart="nose", x=0.5, y=0.5, c=0.9)
+    assert kp.bodypart == "nose"
     assert kp.x == 0.5
     assert kp.y == 0.5
     assert kp.c == 0.9
@@ -14,7 +15,7 @@ def test_keypoint_creation():
 
 def test_pose_result_creation():
     """PoseResult 생성"""
-    keypoints = [KeyPoint(x=0.5, y=0.5, c=0.9) for _ in range(17)]
+    keypoints = [KeyPoint(bodypart="nose", x=0.5, y=0.5, c=0.9) for _ in range(17)]
     pose = PoseResult(run_id="run1", frame_id=0, keypoints=keypoints, confidence=0.95)
 
     assert pose.run_id == "run1"
@@ -24,7 +25,7 @@ def test_pose_result_creation():
 
 
 def test_behavior_label_creation():
-    """BehaviorLabel 생성"""
+    """BehaviorLabel 생성 — intensity 1-10 범위"""
     label = BehaviorLabel(
         run_id="run1",
         frame_id=0,
@@ -35,6 +36,7 @@ def test_behavior_label_creation():
         consistency_score=0.7,
         keypoint_quality=0.75,
         confidence=0.75,
+        intensity=7,  # v3.0: 1-10 범위
         labeler_model="gemma4-unsloth-e4b:latest",
     )
 
@@ -42,6 +44,7 @@ def test_behavior_label_creation():
     assert label.preset_id == "walk_pulling"
     assert label.review_status == "pending"
     assert label.synced is False
+    assert label.intensity == 7
 
 
 def test_labeling_run_creation():

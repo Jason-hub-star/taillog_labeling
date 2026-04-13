@@ -6,6 +6,16 @@
 
 ## 미결 (주인님 확인 필요)
 
+### ~~OD-10: 라벨 카테고리 및 intensity 척도 통일~~ ✅ RESOLVED
+- **결정**: TaillogToss presets.ts 23개 기준으로 통합, intensity 1-10
+- **변경 내용**:
+  - taillog_labeling 27개 → 23개 (12개 제거, 구 normal_* → TaillogToss ID로 교체)
+  - intensity 척도 1-5 → 1-10 (TaillogToss 기준)
+  - `src/utils/label_constants.py` 신설 (단일 상수 SSOT)
+- **제거된 12개**: walk_fearful, walk_distracted, play_rough, cond_destructive, cond_repetitive, cond_toileting, alert_barking, alert_territorial, meal_guarding, meal_picky, meal_stealing, social_fearful, social_dominant, social_separation
+- **마이그레이션**: `label_constants.LEGACY_TO_CURRENT` 변환 테이블 참조
+- **해결일**: 2026-04-13
+
 ### ~~OD-01: dog_id 매핑 전략~~ ✅ RESOLVED
 - **결정**: anonymous dog UUID `612a3d4f-6fc1-406e-8a15-5430a096eee2` 사용 (dogs 테이블에 생성)
 - **해결일**: 2026-04-11
@@ -13,6 +23,18 @@
 ### ~~OD-02: type_id INTEGER 매핑~~ ✅ RESOLVED
 - **결정**: `type_id` 컬럼 없음. 실제 컬럼은 `behavior_type TEXT`. `preset_id` 그대로 사용.
 - **해결일**: 2026-04-11 (실제 Supabase 스키마 직접 확인)
+
+### OD-08: DLC 3.0 (PyTorch) 전환 시점
+- **배경**: DLC 2.3.11은 TF V1 기반 → M1 Metal GPU 가속 근본적 불가 (Apple 공식 제한)
+  - tensorflow-metal 1.2.0 설치 시 TF 2.21 import 파괴 확인 (2026-04-12 검증)
+  - DLC 3.0 (PyTorch 백엔드)은 PyTorch MPS를 통해 M1 GPU 가속 가능
+- **현재 상태**: DLC 3.0.0rc14 (2026-03-10) — 아직 RC, 정식 미출시
+- **전환 조건**: DLC 3.0 정식 출시 + `video_inference_superanimal` API 하위 호환 확인
+- **전환 효과**:
+  - TF 관련 패치 6개 전부 불필요 (deeplabcut-venv.sh 대폭 단순화)
+  - M1 GPU 가속 → 추론 속도 향상 (Phase 2+ 처리량 증가)
+- **현재 조치**: CPU 단일 모드 유지, Phase 2 시점에 재검토
+- **마감**: DLC 3.0 정식 출시 시 (예상 2026 상반기)
 
 ### OD-03: 모바일 앱 플랫폼 선택
 - **질문**: React Native vs Flutter?

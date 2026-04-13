@@ -37,10 +37,9 @@ class BatchResult(Generic[T]):
 
 class KeyPoint(BaseModel):
     """단일 키포인트 — A-07 확정: bodypart 이름 포함 저장
-    bodypart는 M2(SuperAnimal 구현) 전까지 None 허용 (bridge)
-    M2 완료 후 Optional 제거 예정
+    bodypart는 SuperAnimal H5 MultiIndex level_1에서 동적 파싱 (하드코딩 금지)
     """
-    bodypart: Optional[str] = None  # SuperAnimal bodypart 이름 (nose, left_ear, ...)
+    bodypart: str  # SuperAnimal bodypart 이름 (nose, left_ear, ...) — 필수
     x: float                         # 절대 픽셀 좌표 (A-06)
     y: float
     c: float                         # confidence (likelihood)

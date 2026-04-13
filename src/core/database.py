@@ -121,7 +121,9 @@ class Database:
                     consistency_score REAL NOT NULL,
                     keypoint_quality REAL NOT NULL,
                     confidence REAL NOT NULL,
+                    is_problematic INTEGER,
                     review_status TEXT DEFAULT 'pending',
+                    reviewer_note TEXT,
                     critic_pass BOOLEAN,
                     critic_note TEXT,
                     labeler_model TEXT NOT NULL,
@@ -131,6 +133,29 @@ class Database:
                     updated_at TIMESTAMP,
                     FOREIGN KEY(run_id) REFERENCES labeling_runs(id),
                     FOREIGN KEY(run_id, frame_id) REFERENCES pose_results(run_id, frame_id)
+                )
+            """)
+
+            # 기존 DB에 컬럼 없으면 추가 (마이그레이션)
+            for col, definition in [
+                ("is_problematic", "INTEGER"),
+                ("reviewer_note", "TEXT"),
+            ]:
+                try:
+                    cursor.execute(f"ALTER TABLE behavior_labels ADD COLUMN {col} {definition}")
+                except Exception:
+                    pass  # 이미 존재하면 무시
+
+            # category_suggestions — 카테고리에 없는 행동 제안
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS category_suggestions (
+                    id TEXT PRIMARY KEY,
+                    label_id TEXT,
+                    frame_id INTEGER,
+                    run_id TEXT,
+                    description TEXT NOT NULL,
+                    suggested_name TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
 
