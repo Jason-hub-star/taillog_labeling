@@ -67,7 +67,7 @@ class BehaviorLabel(BaseModel):
     antecedent: Optional[str] = None  # ABC 선행
     behavior: Optional[str] = None  # ABC 행동
     consequence: Optional[str] = None  # ABC 결과
-    intensity: Optional[int] = None  # 1-5
+    intensity: Optional[int] = None  # 1-10 (LABEL-SCHEMA.md v3.0)
 
     # 신뢰도 계산 요소
     llm_confidence: float  # LLM 응답 confidence (0~1)
@@ -77,6 +77,7 @@ class BehaviorLabel(BaseModel):
 
     # 검수 상태
     review_status: str = "pending"  # pending, auto_approved, human_review, rejected
+    reviewer_note: Optional[str] = None  # Vision LLM reasoning ([AI] prefix) 또는 검수자 메모
     critic_pass: Optional[bool] = None
     critic_note: Optional[str] = None
 

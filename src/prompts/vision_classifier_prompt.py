@@ -4,7 +4,7 @@ Phase 1: 단일 프레임 zero-shot
 Phase 2+: 5프레임 콜라주 + few-shot (추후 확장)
 """
 
-from src.utils.label_constants import _LABEL_DEFS, LABEL_TO_KO, IS_PROBLEMATIC, NORMAL_CUES
+from src.utils.label_constants import CATEGORIES, LABEL_TO_KO, IS_PROBLEMATIC, NORMAL_CUES
 
 
 def build_vision_classifier_prompt(video_context: str = "") -> str:
@@ -57,21 +57,19 @@ Respond with JSON only. No extra text.
 
 
 def _format_categories() -> str:
-    """label_constants에서 동적으로 카테고리 블록 생성 (하드코딩 금지)."""
-    _CATEGORY_LABELS = {
-        "walk": "Walk",
-        "play": "Play",
-        "condition": "Condition",
-        "alert": "Alert",
-        "meal": "Meal",
-        "social": "Social",
+    """label_constants 공개 상수에서 동적으로 카테고리 블록 생성 (_LABEL_DEFS private 접근 금지)."""
+    _CATEGORY_DISPLAY = {
+        "walk": "Walk", "play": "Play", "condition": "Condition",
+        "alert": "Alert", "meal": "Meal", "social": "Social",
     }
 
     lines = []
-    for cat, defs in _LABEL_DEFS.items():
-        cat_label = _CATEGORY_LABELS.get(cat, cat.upper())
+    for cat, labels in CATEGORIES.items():
+        cat_label = _CATEGORY_DISPLAY.get(cat, cat.upper())
         lines.append(f"\n[{cat_label}]")
-        for preset_id, ko_name, is_prob in defs:
+        for preset_id in labels:
+            ko_name = LABEL_TO_KO.get(preset_id, preset_id)
+            is_prob = IS_PROBLEMATIC.get(preset_id)
             flag = "[PROBLEMATIC]" if is_prob else "[NORMAL]"
             cue = NORMAL_CUES.get(preset_id, "")
             cue_str = f" | Visual cue: {cue}" if cue else ""

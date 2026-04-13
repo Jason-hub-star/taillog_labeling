@@ -146,6 +146,15 @@ class Database:
                 except Exception:
                     pass  # 이미 존재하면 무시
 
+            # pose_results 마이그레이션
+            for col, definition in [
+                ("frame_path", "TEXT"),
+            ]:
+                try:
+                    cursor.execute(f"ALTER TABLE pose_results ADD COLUMN {col} {definition}")
+                except Exception:
+                    pass  # 이미 존재하면 무시
+
             # category_suggestions — 카테고리에 없는 행동 제안
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS category_suggestions (

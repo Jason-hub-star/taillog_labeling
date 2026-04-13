@@ -161,8 +161,8 @@ class PoseExtractor:
             self.db.insert(
                 """
                 INSERT INTO pose_results
-                (id, run_id, frame_id, keypoints_json, confidence, created_at)
-                VALUES (?, ?, ?, ?, ?, ?)
+                (id, run_id, frame_id, keypoints_json, confidence, frame_path, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     pose_result.id,
@@ -170,6 +170,7 @@ class PoseExtractor:
                     pose_result.frame_id,
                     keypoints_json,
                     pose_result.confidence,
+                    pose_result.frame_path,
                     pose_result.created_at.isoformat(),
                 ),
             )

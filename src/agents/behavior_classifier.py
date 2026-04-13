@@ -67,7 +67,7 @@ class BehaviorClassifier:
 
         # 신뢰도 계산
         keypoint_quality = self._calculate_keypoint_quality(keypoints)
-        consistency_score = 0.5  # 단일 프레임 기본값
+        consistency_score = 0.5  # TODO: Phase 4 — 인접 프레임 라벨 일관성 비교로 대체
         confidence = (
             classifier_output.confidence * 0.5
             + consistency_score * 0.3
@@ -76,7 +76,8 @@ class BehaviorClassifier:
 
         # preset_id → is_problematic / category 검증 (label_constants SSOT)
         preset_id = classifier_output.label
-        is_problematic = IS_PROBLEMATIC.get(preset_id)
+        _is_prob = IS_PROBLEMATIC.get(preset_id)
+        is_problematic = None if _is_prob is None else int(_is_prob)  # bool → INTEGER (SQLite)
         category = LABEL_TO_CATEGORY.get(preset_id, preset_id)
 
         # reasoning → reviewer_note ([AI] prefix)
