@@ -55,7 +55,7 @@ def load_labels(filter_mode: str) -> list[dict]:
             LEFT JOIN labeling_runs lr ON bl.run_id = lr.id
         """
         where = {
-            "검수 대기": "WHERE bl.review_status = 'pending'",
+            "검수 대기": "WHERE bl.review_status = 'human_review'",
             "정상행동":  "WHERE bl.is_problematic = 0",
             "문제행동":  "WHERE bl.is_problematic = 1",
             "미분류":    "WHERE bl.preset_id = 'unknown'",
@@ -66,7 +66,8 @@ def load_labels(filter_mode: str) -> list[dict]:
 
 def load_stats() -> dict:
     if not DB_PATH.exists():
-        return dict(total=0, pending=0, reviewed=0, normal=0, problem=0, unknown=0, suggestions=0)
+        return dict(total=0, pending=0, reviewed=0, approved=0, synced=0,
+                    normal=0, problem=0, unknown=0, suggestions=0)
     with get_conn() as conn:
         def n(where=""):
             r = conn.execute(f"SELECT COUNT(*) FROM behavior_labels {where}").fetchone()
@@ -75,8 +76,10 @@ def load_stats() -> dict:
             r = conn.execute("SELECT COUNT(*) FROM category_suggestions").fetchone()
             return r[0] if r else 0
         return dict(
-            total=n(), pending=n("WHERE review_status='pending'"),
-            reviewed=n("WHERE review_status IN ('auto_approved','human_review')"),
+            total=n(), pending=n("WHERE review_status='human_review'"),
+            reviewed=n("WHERE review_status IN ('auto_approved','rejected')"),
+            approved=n("WHERE review_status='auto_approved'"),
+            synced=n("WHERE synced=1"),
             normal=n("WHERE is_problematic=0"), problem=n("WHERE is_problematic=1"),
             unknown=n("WHERE preset_id='unknown'"), suggestions=ns(),
         )
@@ -172,7 +175,7 @@ def render_category_picker(row: dict):
                     type="primary" if is_cur else "secondary",
                     use_container_width=True,
                 ):
-                    save_label(label_id, label, "human_review", None)
+                    save_label(label_id, label, "auto_approved", None)
                     _advance()
                     st.rerun()
             with col_desc:
@@ -192,7 +195,7 @@ def render_category_picker(row: dict):
                         type="primary" if is_cur else "secondary",
                         use_container_width=True,
                     ):
-                        save_label(label_id, label, "human_review", None)
+                        save_label(label_id, label, "auto_approved", None)
                         _advance()
                         st.rerun()
 
@@ -240,7 +243,12 @@ with st.sidebar:
         st.metric("전체", stats["total"])
         c1, c2 = st.columns(2)
         c1.metric("검수 대기", stats["pending"])
-        c2.metric("검수 완료", stats["reviewed"])
+        c2.metric("승인 완료", stats["approved"])
+        cold_start = stats["synced"] < 100
+        if cold_start:
+            st.caption(f"🔴 Cold Start: {stats['synced']}/100건 Supabase 적재")
+        else:
+            st.caption(f"✅ Cold Start 해제 ({stats['synced']}건 적재)")
         st.divider()
         total_n = stats["total"]
         st.metric("✅ 정상", f"{stats['normal']}건 ({stats['normal']/total_n*100:.0f}%)")
@@ -341,12 +349,12 @@ with col_info2:
     b1, b2 = st.columns(2)
     with b1:
         if st.button("✅ 맞음", key="btn_accept", type="primary", use_container_width=True):
-            save_label(row["id"], preset, "human_review", None)
+            save_label(row["id"], preset, "auto_approved", None)
             _advance()
             st.rerun()
     with b2:
         if st.button("❌ 틀림", key="btn_reject", use_container_width=True):
-            save_label(row["id"], "unknown", "human_review", "검수자 거부")
+            save_label(row["id"], "unknown", "rejected", "검수자 거부")
             _advance()
             st.rerun()
 
