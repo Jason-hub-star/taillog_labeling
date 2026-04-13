@@ -275,3 +275,92 @@ git clone https://github.com/mshooter/SyDogVideo_release # SyDog-Video
 | DogFLW | DogFLW | arXiv:2405.11501 |
 | CREMD | CREMD | arXiv:2602.15349 |
 | DEBIw | DEBIw | ACM ACI 2022 |
+
+---
+
+## 외부 데이터셋으로 사전 파인튜닝 가능성 검토
+
+> 조사일: 2026-04-13 | M5 MacBook Air 32GB 환경 기준
+
+### 결론: 가능하지만 지금은 비추천
+
+| 타이밍 | 방법 | 추천 여부 |
+|--------|------|---------|
+| **지금 (Phase 1)** | 외부 데이터 파인튜닝 | ❌ 투자 대비 효과 낮음 |
+| **Phase 2 (~500건)** | Few-shot 예시 이미지 추가 | ✅ 권장 (프롬프트 엔지니어링만으로 +15~20%) |
+| **Phase 3 (~2,000건)** | TailLog 자체 데이터로 파인튜닝 | ✅ 최적 타이밍 |
+
+---
+
+### M5 32GB에서 파인튜닝 기술 스택
+
+**가능한 모델**: qwen2.5vl:7b (26B는 불가)
+
+| 도구 | 상태 | 비고 |
+|-----|------|------|
+| **Unsloth** | ❌ Mac 미지원 | CUDA/Triton 의존 |
+| **mlx-tune** | ⚠️ 커뮤니티 프로젝트 | github.com/ARahim3/mlx-tune, 안정성 미검증 |
+| **LLaMA Factory** | ✅ Qwen2.5-VL 공식 지원 | MLX 통합 여부 추가 확인 필요 |
+
+**메모리 요구**: 7B LoRA 파인튜닝 약 18GB → 32GB로 이론상 가능 (배치 크기 ≤ 8)
+
+**소요 시간 추정** (500건, 2 epoch):
+- 데이터 준비: 3~5시간 (매핑 테이블 수동 작성)
+- 학습: 20~30분 (M5 기준)
+- GGUF 변환 + Ollama 등록: 30분
+- **총합**: 약 5~7시간
+
+---
+
+### 파인튜닝 데이터 파이프라인 (ChatML 포맷)
+
+```python
+# 외부 데이터셋 → Qwen2.5-VL instruction 포맷 변환 예시
+{
+  "messages": [
+    {"role": "system", "content": "<vision_classifier_prompt>"},
+    {"role": "user", "content": [
+      {"type": "image", "image": "<base64 또는 path>"},
+      {"type": "text", "text": "23개 preset 중 분류해줘"}
+    ]},
+    {"role": "assistant", "content": '{"preset_id": "cond_anxious", "confidence": 0.9}'}
+  ]
+}
+```
+
+**데이터셋별 매핑 난이도**:
+| 데이터셋 | 원본 라벨 | TailLog 매핑 | 난이도 |
+|---------|---------|------------|------|
+| DEBIw | Anxiety, Contentment, Aggression, Fear | cond_anxious, cond_good, alert_aggression | 중 |
+| Dog Emotion v2 | sad, angry, relaxed, happy | cond_tired, alert_aggression, cond_good, cond_excited | 중 |
+| ziya07 | 계층적 행동 | walk_*, play_*, meal_* 다수 | 높음 (스키마 불명) |
+
+---
+
+### Ollama 서빙 경로
+
+```bash
+# 1. 파인튜닝 완료 후 GGUF 변환
+python convert_hf_to_gguf.py --model-dir ./ft-output --quantization Q4_K_M
+
+# 2. Modelfile 생성
+echo 'FROM ./model.gguf' > Modelfile.taillog
+ollama create qwen25vl-taillog:latest -f Modelfile.taillog
+
+# 3. config.py에 모델명 추가 후 테스트
+```
+
+---
+
+### Phase 3 파인튜닝 실행 기준
+
+파인튜닝 착수 전 충족 조건:
+- [ ] `behavior_labels` ≥ 2,000건
+- [ ] human_review 완료 건수 ≥ 500건
+- [ ] Cohen's Kappa ≥ 0.80 (검수자 간 일치도)
+- [ ] Phase 2 few-shot 대비 baseline accuracy 측정 완료
+
+착수 시 사용할 학습 데이터:
+- 자체 TailLog 검수 완료 데이터 (primary)
+- DEBIw + Dog Emotion v2 (cond_* 보강용, secondary)
+- 7개 미충족 라벨: 외부 소스 없음 → 자체 수집 강화 필요
