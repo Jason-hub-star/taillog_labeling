@@ -50,6 +50,7 @@
 | `PIPELINE-DIAGRAM.md` | 파이프라인 ASCII 다이어그램 |
 | `SELF-CRITIQUE-LOG.md` | 주간 자기 회고 + 실험 기록 |
 | `PRE-DEV-CHECKLIST.md` | Phase 1 시작 전 완료 항목 (모델 비교, 연결 테스트) |
+| `EXTERNAL-DATASETS.md` | 공개 강아지 행동 데이터셋 조사 — few-shot/전이학습 활용 로드맵 |
 
 ## docs/architecture — 구현 상세
 
