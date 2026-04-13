@@ -16,6 +16,12 @@ build/
 data/models/
 !data/models/.gitkeep
 
+# 외부 데이터셋 (대용량 — 로컬 전용, git 제외)
+data/external/full_datasets/
+data/external/few_shot_samples/
+!data/external/full_datasets/.gitkeep
+!data/external/few_shot_samples/.gitkeep
+
 # 영상 캐시 (개인정보)
 data/cache/youtube_videos/
 data/cache/extracted_frames/
