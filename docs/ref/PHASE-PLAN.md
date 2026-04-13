@@ -10,8 +10,8 @@
 
 | 스텝 | 파일 | 완료 기준 |
 |------|------|---------|
-| 1.1 | `scripts/setup/bootstrap.sh` | `data/models/yolov8n-pose.pt` 존재 |
-| 1.2 | `src/core/config.py` | `python -c "from src.core.config import *"` 오류 없음 |
+| 1.1 | `scripts/setup/bootstrap.sh` | `data/models/superanimal/.downloaded` 존재 |
+| 1.2 | `src/utils/config.py` | `python -c "from src.utils.config import Config"` 오류 없음 |
 | 1.3 | `src/core/database.py` | `sqlite3 labeling.db ".tables"` → 7개 테이블 출력 |
 | 1.4 | `scripts/setup/test-ollama.sh` | gemma4-unsloth-e4b 응답 확인 |
 | 1.5 | `src/core/supabase_client.py` | TailLog DB 연결 확인 |
@@ -28,7 +28,7 @@
 
 ## Phase 2: 수집 → 포즈 추출 (Week 2)
 
-**목표**: YouTube 자동 다운로드 + YOLOv8 키포인트 추출 파이프라인
+**목표**: YouTube 자동 다운로드 + SuperAnimal-Quadruped 키포인트 추출 파이프라인
 
 | 스텝 | 파일 | 완료 기준 |
 |------|------|---------|
@@ -47,25 +47,31 @@
 
 ---
 
-## Phase 3: 행동 분류 → ABC 라벨링 (Week 3)
+## Phase 3: 행동 분류 → ABC 라벨링 (Week 3) — 재설계 (2026-04-12)
 
-**목표**: gemma4-unsloth로 행동 분류 + ABC 구조화, 신뢰도 측정
+**목표**: Vision LLM(gemma4:26b) 기반 프레임 이미지 행동 분류 + Streamlit 검수 앱 + ABC 구조화
+
+> ⚠️ 설계 변경: gemma4-unsloth(keypoints) → gemma4:26b Vision(프레임 이미지)
+> 근거: dry_run 검증 결과 keypoints 좌표 기반 분류 100% unknown — 구조적 한계 확인
 
 | 스텝 | 파일 | 완료 기준 |
 |------|------|---------|
-| 3.1 | `src/utils/prompt_builder.py` | 프롬프트 텍스트 생성 확인 |
-| 3.2 | `src/core/llm_client.py` | Ollama 응답 파싱 성공 |
-| 3.3 | `src/agents/behavior_classifier.py` | label + confidence 저장 |
+| 3.0 | `scripts/review/review_app.py` | Streamlit 검수 앱 실행 확인 (POC 전 선행) |
+| 3.1 | POC 테스트 | gemma4:26b 프레임 이미지 분류 품질 확인 (5건 수동 검수) |
+| 3.2 | `src/agents/behavior_classifier.py` | Vision LLM 기반 재작성, 이미지 입력 분류 확인 |
+| 3.3 | `src/prompts/vision_classifier_prompt.py` | 21개 카테고리 Vision 프롬프트, few-shot 예시 포함 |
 | 3.4 | `src/agents/abc_labeler.py` | ABC 3필드 + intensity 저장 |
 | 3.5 | `src/agents/critic.py` | critic pass/fail 기록 |
 | 3.6 | `tests/test_behavior_classifier.py` | pytest 통과 |
 
 **Phase 3 완료 기준**:
+- [ ] Streamlit 검수 앱 실행 (로컬 브라우저)
+- [ ] POC: gemma4:26b 5건 분류 결과 수동 검수 통과
 - [ ] 500건 라벨 생성
 - [ ] 신뢰도 분포 측정 (≥0.85 비율 확인)
 - [ ] critic shadow mode 200건 누적
 - [ ] 카테고리별 분포 확인 (6개 중 최소 4개 카테고리 등장)
-- [ ] auto_approved 첫 100건 인간 검수 완료
+- [ ] cold start 100건 인간 검수 완료 (Streamlit 앱 사용)
 
 ---
 
@@ -95,17 +101,18 @@
 | 마일스톤 | 목표 건수 | 다음 단계 활성화 |
 |---------|---------|--------------|
 | M1 | 100건 synced | cold start 모드 해제 |
-| M2 | 500건 synced | critic active mode |
-| M3 | 2,000건 synced | category별 임계값 차등 검토 |
-| M4 | 10,000건 synced | 프로덕션 모델 이식 검토 |
+| M2 | 500건 synced | critic active mode + **YOLOv8 첫 실험** |
+| M3 | 1,500건 synced | 소형견 비율 보정 학습 |
+| M4 | 3,000건 synced | Dog-Pose 6,773장 병합 → 프로덕션 결정 |
 
 ---
 
 ## 프로덕션 이식 기준 (M4 이후)
 
-- [ ] 10,000건 라벨 누적
+- [ ] 자체 라벨 3,000건 + Dog-Pose 6,773장 병합 학습 완료
 - [ ] auto_approved rate ≥ 50%
 - [ ] critic active mode pass rate ≥ 90%
 - [ ] Cohen's Kappa ≥ 0.80 (human reviewer 간 일관성)
 - [ ] 6개 카테고리 균형 분포 (각 카테고리 ≥ 5%)
+- [ ] YOLOv8 소형견 탐지율 ≥ 85%, 추론 ≤ 100ms/frame
 - [ ] 주인님 최종 승인

@@ -11,8 +11,8 @@
         │ video_file_path
         ▼
 ┌───────────────┐
-│pose_extractor │  YOLOv8n-pose
-│               │  1 FPS, 17 keypoints
+│pose_extractor │  SuperAnimal-Quadruped (DeepLabCut)
+│               │  1 FPS, 39 keypoints
 └───────┬───────┘
         │ pose_results JSON
         ▼

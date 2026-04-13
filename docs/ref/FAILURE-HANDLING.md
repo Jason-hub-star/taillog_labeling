@@ -12,7 +12,7 @@
 |------|------|-----------|
 | Network timeout | YouTube 다운로드 중단 | exponential backoff (1s→2s→4s), max 3회 |
 | Rate limit | yt-dlp 429 응답 | 30분 대기 후 1회 retry |
-| GPU OOM | YOLO 배치 처리 중 OOM | batch_size //= 2 후 즉시 retry |
+| GPU OOM (SuperAnimal) | pose_extractor DLC 추론 중 OOM | `--device cpu` 폴백 후 즉시 재시도 (A-08) |
 | Ollama timeout | LLM 응답 지연 | 60초 timeout, 3회 retry |
 | Supabase connection | DB 연결 실패 | 1s→2s→4s, max 3회 |
 
@@ -39,7 +39,7 @@
 | collector | YouTube geo-block | 영상 skip + source policy 업데이트 |
 | collector | Private video | 영상 skip (정상, 기록만) |
 | pose_extractor | 0 detections | discard (watchdog 통지 없음) |
-| pose_extractor | GPU OOM | batch_size 절반 + retry |
+| pose_extractor | GPU OOM (SuperAnimal) | `--device cpu` 폴백 후 재시도 (A-08) |
 | behavior_classifier | LLM timeout | retry 3회 → watchdog |
 | behavior_classifier | Parse error | critic에 raw_response 전달 |
 | abc_labeler | Partial response | critic mandatory |

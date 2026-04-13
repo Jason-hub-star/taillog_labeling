@@ -9,7 +9,7 @@
 
 | 단계 | 역할 | 모델 | 우선순위 | 이유 |
 |------|------|------|---------|------|
-| pose_extraction | 키포인트 추출 | YOLOv8n-pose (local) | deterministic | 규칙 기반, LLM 불필요 |
+| pose_extraction | 키포인트 추출 | SuperAnimal-Quadruped (DeepLabCut, .venv_dlc) | deterministic | Zero-shot mAP 84.6, 39 keypoints, LLM 불필요 |
 | behavior_classifier | 행동 1차 분류 | `gemma4-unsloth-e4b:latest` | 속도 | 반복 작업, 비용 최소화 |
 | abc_labeler | ABC 구조화 | `gemma4-unsloth-e4b:latest` | 속도 | 반복 작업 |
 | critic | 품질 검수 | `gemma4:26b-a4b-it-q4_K_M` | 정확도 | 최종 게이트 |

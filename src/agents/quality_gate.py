@@ -1,5 +1,6 @@
 """Quality Gate 에이전트 — 신뢰도 기반 review_status 설정"""
 
+import os
 from datetime import datetime
 from typing import Optional
 
@@ -13,9 +14,16 @@ class QualityGate:
     AUTO_APPROVED_THRESHOLD = 0.85
     HUMAN_REVIEW_THRESHOLD = 0.65
     COLD_START_LIMIT = 100  # 초기 100건은 모두 human_review
+    # 오버라이드: COLD_START_LIMIT=0 환경변수로 cold_start 비활성화 가능
 
     def __init__(self):
         self.db = get_db()
+        # 환경변수로 cold_start_limit 오버라이드 (테스트/첫 sync 시 0으로 설정)
+        env_limit = os.environ.get("COLD_START_LIMIT")
+        if env_limit is not None:
+            self.cold_start_limit = int(env_limit)
+        else:
+            self.cold_start_limit = self.COLD_START_LIMIT
 
     def run(self, label_id: str, dry_run: bool = False) -> bool:
         """
@@ -45,7 +53,7 @@ class QualityGate:
         )
         synced_count = total_synced.get("cnt", 0) if total_synced else 0
 
-        if synced_count < self.COLD_START_LIMIT:
+        if synced_count < self.cold_start_limit:
             # Cold Start 모드: 모든 라벨을 human_review
             review_status = "human_review"
         elif preset_id == "unknown":
