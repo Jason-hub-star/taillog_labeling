@@ -70,25 +70,34 @@
 - **활용법**: 감정 분류 few-shot 예시 이미지 (바로 다운로드 가능)
 - **라이선스**: 공개
 
-### DogFLW Dataset ⭐⭐⭐
+### DogFLW Dataset ⭐⭐ *(다운로드 완료 — 실제 검증)*
 - **출처**: arXiv 2405.11501 | [Kaggle](https://www.kaggle.com/datasets/georgemartvel/dogflw)
-- **크기**: 4,335개 이미지
-- **주석**: 46개 얼굴 특징점 (DogFACS 기반)
-- **TailLog 매핑**: 얼굴 표정 기반 `cond_anxious`, `cond_excited`, `cond_tired` 구분
-- **활용법**: Phase 2에서 Critic 에이전트 보조 (얼굴 표정 검증)
+- **크기**: 4,335개 이미지 PNG + JSON (1.4GB)
+- **실제 내용**: `train/images/` + `train/labels/` 구조
+  - images: 강아지 얼굴 PNG (품종 다양)
+  - labels: 46개 랜드마크 좌표 JSON (`{"landmarks": [[x,y], ...]}`)
+- **⚠️ 행동/감정 라벨 없음**: 좌표 데이터만 존재. few-shot 이미지로 직접 사용 불가.
+- **수정된 활용법**: Phase 3 얼굴 표정 보조 모델 학습용 (좌표 → 감정 분류기 별도 구축 필요)
 - **라이선스**: CC BY-NC 4.0
+- **다운로드 경로**: `data/external/few_shot_samples/dogflw/DogFLW/`
 
 ---
 
 ## 2. 산책 / 놀이 행동 (walk_*, play_* 매핑)
 
-### Dog Behavior Monitoring Dataset (ziya07) ⭐⭐⭐⭐⭐
+### Dog Behavior Monitoring Dataset (ziya07) ⭐⭐ *(다운로드 완료 — 실제 검증)*
 - **출처**: [Kaggle](https://www.kaggle.com/datasets/ziya07/dog-behavior-monitoring-dataset)
 - **최신 업데이트**: 2025년 4월
-- **특징**: Multi-Level Postures, Atomic Behaviors, Complex Behavior Annotation (계층적 라벨)
-- **TailLog 매핑**: `walk_*`, `play_*`, `meal_*`, `social_*` 전반에 걸쳐 매핑 가능
-- **활용법**: 가장 포괄적인 소스. few-shot 예시 이미지 추출 우선 검토
-- **라이선스**: 공개
+- **실제 내용**: CSV 파일 1개 (352KB), 3,000행
+  - 컬럼: `neck_x/y/z`, `back_x/y/z`, `head_posture`, `body_posture`, `atomic_behavior`, `complex_behavior`
+  - **이미지 없음** — 합성(synthetic) 센서 수치 데이터
+  - `complex_behavior` 전체가 `Abnormal|Abnormal|Abnormal` (품질 의심)
+- **라벨 분포**:
+  - head_posture: HeadDown(1,043) / Bark(986) / HeadUp(971)
+  - atomic_behavior: Standing / Lying / Digging / Sitting / Escaping / Walking / Sniffing / Barking
+- **⚠️ Vision LLM 학습 불가**: 이미지 없는 센서 시뮬레이션 데이터
+- **수정된 활용법**: IMU 기반 행동 분류기 참고용 (Phase 4+). Vision 파인튜닝 소스로 사용 불가.
+- **다운로드 경로**: `data/external/few_shot_samples/ziya07/dog_behavior_dataset.csv`
 
 ### DogMo Dataset ⭐⭐⭐⭐
 - **출처**: arXiv 2510.24117
@@ -182,21 +191,21 @@
 
 | preset_id | 최적 데이터셋 | 비고 |
 |-----------|------------|------|
-| `walk_normal` | Dog Behavior Monitoring (ziya07), DogMo | 기본 분류 |
+| `walk_normal` | DogMo, DECADE | ziya07은 이미지 없음 |
 | `walk_pulling` | — | **공개 데이터셋 없음** (직접 수집 필요) |
 | `walk_reactive` | EgoPet, Roboflow Barking | 부분 매핑 |
 | `walk_refuse` | — | **공개 데이터셋 없음** |
-| `play_normal` | DECADE, Dog Behavior Monitoring | 기본 분류 |
+| `play_normal` | DECADE | 기본 분류 |
 | `play_overexcited` | CREMD (excitement), DogMo (running) | 간접 매핑 |
 | `play_resource` | — | **공개 데이터셋 없음** |
-| `cond_good` | DEBIw (Contentment), Dog Emotion v2 (happy) | ✅ 직접 매핑 |
-| `cond_excited` | CREMD (excitement), Dog Emotion v2 | ✅ 직접 매핑 |
-| `cond_tired` | Dog Emotion v2 (sad), DogMo (lying) | 간접 매핑 |
-| `cond_anxious` | DEBIw (Anxiety), CREMD (fear) | ✅ 직접 매핑 |
+| `cond_good` | DEBIw (Contentment), Dog Emotion v2 (happy, relaxed) ✅ | **다운로드 완료** |
+| `cond_excited` | CREMD (excitement), Dog Emotion v2 (happy) ✅ | **다운로드 완료** |
+| `cond_tired` | Dog Emotion v2 (sad) ✅, DogMo (lying) | **다운로드 완료** |
+| `cond_anxious` | DEBIw (Anxiety), CREMD (fear) | 미다운로드 |
 | `alert_vomit` | — | **공개 데이터셋 없음** |
 | `alert_diarrhea` | — | **공개 데이터셋 없음** |
 | `alert_limp` | RGBD-Dog (비정상 보행), DogMo | 간접 매핑 |
-| `alert_aggression` | DEBIw (Aggression), CREMD (anger) | ✅ 직접 매핑 |
+| `alert_aggression` | DEBIw (Aggression), Dog Emotion v2 (angry) ✅ | **다운로드 완료** |
 | `alert_noeat` | — | **공개 데이터셋 없음** |
 | `meal_full` | Roboflow (Eating) | 간접 매핑 |
 | `meal_half` | — | **공개 데이터셋 없음** |
@@ -364,3 +373,53 @@ ollama create qwen25vl-taillog:latest -f Modelfile.taillog
 - 자체 TailLog 검수 완료 데이터 (primary)
 - DEBIw + Dog Emotion v2 (cond_* 보강용, secondary)
 - 7개 미충족 라벨: 외부 소스 없음 → 자체 수집 강화 필요
+
+---
+
+## 실제 다운로드 현황 (2026-04-13 기준)
+
+| 데이터셋 | 상태 | 경로 | 크기 | Vision 활용 가능 |
+|---------|------|------|------|----------------|
+| Dog Emotion v2 | ✅ few-shot 샘플 완료 | `data/external/few_shot_samples/dog_emotion_v2/` | 944KB (30장) | ✅ 즉시 가능 |
+| ziya07 | ✅ 다운로드 완료 | `data/external/few_shot_samples/ziya07/dog_behavior_dataset.csv` | 352KB | ❌ 이미지 없음 (센서 CSV) |
+| dogflw | ✅ 다운로드 완료 | `data/external/few_shot_samples/dogflw/DogFLW/` | 1.4GB | ⚠️ 이미지 있으나 행동 라벨 없음 |
+| DEBIw | ❌ 미다운로드 | — | ~수백MB | ✅ 다운로드 시 cond_anxious 등 강화 |
+| CREMD | ❌ 미다운로드 | — | ~1GB | ✅ 감정 비디오 클립 |
+| DogMo | ❌ 미다운로드 | — | 大 | ✅ 3D 포즈 기반 |
+
+### Dog Emotion v2 few-shot 폴더 구조
+```
+data/external/few_shot_samples/dog_emotion_v2/
+├── alert_aggression/   (10장 — angry)
+├── cond_good/          (10장 — happy + relaxed)
+└── cond_tired/         (10장 — sad)
+```
+> `cond_excited`는 happy와 라벨 중복 → cond_good으로 통합. 필요 시 재분류 가능.
+
+### ziya07 실제 라벨 구조 (센서 데이터)
+```
+dog_behavior_dataset.csv — 3,000행
+컬럼: dog_id, timestamp, neck_x/y/z, back_x/y/z,
+      head_posture, body_posture, atomic_behavior, complex_behavior
+atomic_behavior 유니크: Standing, Lying, Digging, Sitting,
+                        Escaping, Walking, Sniffing, Barking
+complex_behavior: 전체 Abnormal|Abnormal|Abnormal (합성 데이터)
+→ 행동 분포 참고용으로만 활용 가능. 이미지 없어 Vision 학습 불가.
+```
+
+### dogflw 실제 구조 (얼굴 랜드마크)
+```
+DogFLW/
+├── train/
+│   ├── images/   (강아지 얼굴 PNG)
+│   └── labels/   ({"landmarks": [[x,y]×46]} JSON)
+└── test/
+    ├── images/
+    └── labels/
+→ 행동/감정 라벨 없음. 좌표 기반 표정 분류기 별도 학습 시에만 의미 있음.
+```
+
+### 다음 다운로드 우선순위
+1. **DEBIw**: `cond_anxious`, `alert_aggression` 강화 — ACM 논문에서 직접 다운로드
+2. **CREMD**: 비디오 기반 감정 분류 — arXiv 2602.15349 저자에게 요청
+3. **DogMo**: 3D 모션 데이터 — arXiv 2510.24117 저자에게 요청
