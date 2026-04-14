@@ -1,4 +1,4 @@
-"""Ollama LLM 클라이언트 래퍼"""
+"""LLM 클라이언트 래퍼 — Ollama(로컬) / Gemini(API) 지원"""
 
 import json
 import random
@@ -10,6 +10,13 @@ try:
     import ollama
 except ImportError:
     ollama = None
+
+try:
+    from google import genai
+    from google.genai import types as genai_types
+except ImportError:
+    genai = None
+    genai_types = None
 
 
 class OllamaClient:
@@ -141,8 +148,83 @@ class OllamaClient:
             raise ValueError(f"JSON parse error: {str(e)}\nContent: {content[:200]}")
 
 
+class GeminiClient:
+    """Google Gemini Vision API 클라이언트"""
+
+    DEFAULT_MODEL = "gemini-2.5-flash"
+
+    def __init__(self, api_key: str = None):
+        if genai is None:
+            raise RuntimeError("google-genai 패키지 필요: pip install google-genai")
+        self.api_key = api_key or os.getenv("GEMINI_API_KEY")
+        if not self.api_key:
+            raise RuntimeError("GEMINI_API_KEY 환경변수 필요")
+        self.client = genai.Client(api_key=self.api_key)
+
+    def generate_with_image(
+        self,
+        model: str,
+        prompt: str,
+        image_base64: str,
+        temperature: float = 0.3,
+        retry_count: int = 3,
+    ) -> Dict[str, Any]:
+        """
+        Gemini Vision API 호출 — 이미지 + 프롬프트
+
+        Returns:
+            {"content": "...", "stop_reason": "stop", "model": "..."}
+        """
+        import base64
+
+        image_bytes = base64.b64decode(image_base64)
+        _TRANSIENT = (Exception,)
+
+        for attempt in range(retry_count):
+            try:
+                response = self.client.models.generate_content(
+                    model=model,
+                    contents=[
+                        genai_types.Part.from_bytes(data=image_bytes, mime_type="image/jpeg"),
+                        prompt,
+                    ],
+                    config=genai_types.GenerateContentConfig(
+                        temperature=temperature,
+                        response_mime_type="application/json",
+                    ),
+                )
+                return {
+                    "content": response.text,
+                    "stop_reason": "stop",
+                    "model": model,
+                }
+            except Exception as e:
+                if attempt < retry_count - 1:
+                    time.sleep(2 ** attempt + random.uniform(0, 1))
+                else:
+                    raise RuntimeError(
+                        f"Gemini Vision failed after {retry_count} retries: {str(e)}"
+                    ) from e
+
+    def parse_json_response(self, content: str) -> Dict[str, Any]:
+        """LLM 응답을 JSON으로 파싱"""
+        try:
+            if "```json" in content:
+                start = content.index("```json") + 7
+                end = content.index("```", start)
+                content = content[start:end].strip()
+            elif "```" in content:
+                start = content.index("```") + 3
+                end = content.index("```", start)
+                content = content[start:end].strip()
+            return json.loads(content)
+        except (json.JSONDecodeError, ValueError) as e:
+            raise ValueError(f"JSON parse error: {str(e)}\nContent: {content[:200]}")
+
+
 # 글로벌 인스턴스
 _client_instance: Optional[OllamaClient] = None
+_gemini_instance: Optional[GeminiClient] = None
 
 
 def get_ollama_client() -> OllamaClient:
@@ -151,3 +233,11 @@ def get_ollama_client() -> OllamaClient:
     if _client_instance is None:
         _client_instance = OllamaClient()
     return _client_instance
+
+
+def get_gemini_client() -> GeminiClient:
+    """글로벌 Gemini 클라이언트 반환"""
+    global _gemini_instance
+    if _gemini_instance is None:
+        _gemini_instance = GeminiClient()
+    return _gemini_instance

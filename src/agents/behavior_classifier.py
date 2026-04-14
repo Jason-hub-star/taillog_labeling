@@ -10,28 +10,38 @@ Phase 2+ 예정:
 """
 
 import json
+import os
 import uuid
 from datetime import datetime
 from typing import Optional
 
 from src.core.database import get_db
 from src.core.image_utils import load_frame_image, image_to_base64
-from src.core.llm import get_ollama_client
+from src.core.llm import get_ollama_client, get_gemini_client
 from src.core.models import ClassifierOutput, BehaviorLabel
 from src.prompts.vision_classifier_prompt import build_vision_classifier_prompt
 from src.utils.config import Config
 from src.utils.label_constants import IS_PROBLEMATIC, LABEL_TO_CATEGORY
 
+# LLM 백엔드 선택: "gemini" | "ollama"
+_LLM_BACKEND = os.getenv("LLM_BACKEND", "gemini")
+
 
 class BehaviorClassifier:
     """Vision LLM 기반 행동 분류 에이전트"""
 
-    MODEL = Config.BEHAVIOR_CLASSIFIER_MODEL  # gemma4:26b-a4b-it-q4_K_M
+    GEMINI_MODEL = "gemini-2.5-flash"
+    OLLAMA_MODEL = Config.BEHAVIOR_CLASSIFIER_MODEL  # gemma4:26b-a4b-it-q4_K_M
     RETRY_COUNT = 3
 
     def __init__(self):
         self.db = get_db()
-        self.llm = get_ollama_client()
+        if _LLM_BACKEND == "gemini":
+            self.llm = get_gemini_client()
+            self.MODEL = self.GEMINI_MODEL
+        else:
+            self.llm = get_ollama_client()
+            self.MODEL = self.OLLAMA_MODEL
 
     def run(
         self,

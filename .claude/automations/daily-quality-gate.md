@@ -6,10 +6,10 @@
 ---
 
 ## 목적
-behavior_labels 중 pending 항목을 신뢰도 기준으로 분류한다.
+behavior_labels 중 미분류 항목을 신뢰도 기준으로 분류한다.
 
 ## 처리
-1. SQLite `behavior_labels WHERE review_status = 'pending'` 조회
+1. SQLite `behavior_labels WHERE review_status = 'human_review'` 조회
 2. confidence 기준 분류:
    - ≥ 0.85 → `auto_approved`
    - 0.65 ~ 0.84 → `human_review`
@@ -18,7 +18,7 @@ behavior_labels 중 pending 항목을 신뢰도 기준으로 분류한다.
 4. auto_approved 건수 → sync_writer 대기 큐 등록
 
 ## 성공 조건
-- pending 항목 전체 처리 완료
+- human_review 항목 전체 처리 완료
 - auto_approved 또는 human_review 건수 > 0
 
 ## 실패 조건

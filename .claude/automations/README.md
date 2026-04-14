@@ -2,21 +2,32 @@
 
 이 폴더는 Claude 스케줄러에 등록할 운영 프롬프트 모음이다.
 
-## Recommended Set
+## Phase 1 — 지금 써야 할 것 (2026-04-13 기준)
 
 | File | Purpose | Cadence |
 |------|---------|---------|
-| `daily-pipeline.md` | YouTube 수집 → 포즈 추출 → 분류 → ABC 라벨링 | 매일 1회 |
-| `daily-quality-gate.md` | 신뢰도 필터링 (≥0.85 자동 승인, 0.65~0.85 큐) | 매일 1회, pipeline 이후 |
-| `daily-critic-review.md` | gemma4:26b 품질 검수 (shadow → active) | 매일 1회, quality-gate 이후 |
-| `daily-sync-monitor.md` | Supabase sync 상태 감시 + 실패 복구 | 매일 1회, critic-review 이후 |
-| `weekly-model-eval.md` | gemma4 모델 비교 평가, promote 결정 | 주 1회 |
-| `weekly-dataset-health.md` | 라벨 분포, 신뢰도 트렌드, 이상 탐지 | 주 1회 |
-| `weekly-pipeline-audit.md` | 파이프라인 드리프트 감시, 회귀 탐지 | 주 1회 |
+| `nightly-vision-labeling.md` | 기존 프레임 gemma4:26b Vision 분류 (545프레임, 약 11시간) | 야간 1회 |
+| `daily-pipeline.md` | YouTube 수집 → 포즈 추출 → 분류 | 새 영상 추가할 때 |
+| `daily-quality-gate.md` | 신뢰도 필터링 (≥0.85 자동 승인, 0.65~0.84 human_review) | pipeline 이후 |
+| `daily-sync-monitor.md` | Supabase sync + 실패 복구 | auto_approved 발생 시 |
 
-## Execution Order (Daily)
+## Phase 2+ — 데이터 쌓이면 활성화
+
+| File | Purpose | 활성화 시점 |
+|------|---------|-----------|
+| `daily-critic-review.md` | gemma4:26b critic 품질 검수 (shadow → active) | synced ≥ 200건 |
+| `weekly-dataset-health.md` | 라벨 분포, 신뢰도 트렌드 | 500건+ |
+| `weekly-pipeline-audit.md` | 파이프라인 회귀 탐지 | 500건+ |
+| `weekly-model-eval.md` | 모델 비교 평가, promote 결정 | 1,000건+ |
+| `weekly-autoresearch-loop.md` | 프롬프트/모델 실험 루프 | Phase 3 |
+
+## Execution Order
 
 ```
+[Phase 1]
+nightly-vision-labeling → daily-quality-gate → daily-sync-monitor
+
+[Phase 2+]
 daily-pipeline → daily-quality-gate → daily-critic-review → daily-sync-monitor
 ```
 

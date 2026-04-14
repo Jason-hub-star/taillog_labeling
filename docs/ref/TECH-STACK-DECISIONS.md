@@ -132,18 +132,73 @@
 - **shadow mode 초기**: critic은 `gemma4:26b`로 시작. 데이터 200건 누적 후 promote 여부 평가
 - **분류 방식 전환 근거**: dry_run 검증 결과 keypoints 좌표 기반 분류 100% unknown — 구조적 한계 확인 (2026-04-12)
 
-### A-10. Vision LLM 행동 분류 전략 ✅ 확정 (2026-04-12)
+### A-10. Vision LLM 행동 분류 전략 ✅ 확정 (2026-04-12, 업데이트 2026-04-14)
 
 - **결정**: behavior_classifier 입력을 keypoints JSON → **프레임 이미지 (JPEG)** 로 전환
-- **모델**: `gemma4:26b-a4b-it-q4_K_M` — Ollama 로컬, 멀티모달 Vision 지원
+- **현재 모델**: `gemini-2.5-flash` — Google Gemini API (클라우드)
+- **백엔드 전환**: `LLM_BACKEND=gemini` (기본값) / `LLM_BACKEND=ollama` (로컬 fallback)
 - **Phase 전략**:
   - **Phase 1 (M1, ~100건)**: 단일 프레임 이미지 zero-shot, cold start 100건 전수 검수
   - **Phase 2 (M2, ~500건)**: 5프레임 콜라주 + few-shot (confidence threshold 자동 승인 활성화)
-  - **Phase 3+ (M4, ~3000건)**: 파인튜닝 검토 (LoRA/QLoRA, gemma-tuner-multimodal 참고)
-- **처리 시간 (M1 기준)**: 1건당 12초 (이미지 인코딩 3초 + 추론 ~9초)
+  - **Phase 3+ (M4, ~3,000건)**: 파인튜닝 전환 (→ A-11 참조)
+- **처리 시간 (Gemini API 기준)**: 8~10초/프레임, 545장 기준 약 75~90분
 - **전체 파이프라인 1건**: 포즈 추출 7분 + 분류 84분 = **~90분/영상**
 - **인간 검수 UI**: Streamlit (`scripts/review/review_app.py`) — 이미지 + 맞음/틀림/수정/메모
-- **파인튜닝 보류 조건**: 라벨 데이터 3,000건 + Cohen's Kappa ≥ 0.80 확인 후 재검토
+- **파인튜닝 전환 조건**: 라벨 데이터 3,000건 + Cohen's Kappa ≥ 0.80 (→ A-11)
+
+#### Gemini 2.5 Flash 선택 근거 (2026-04-14)
+
+| 항목 | 내용 |
+|------|------|
+| **선택 모델** | `gemini-2.5-flash` |
+| **탈락: gemini-2.0-flash** | 신규 계정 접근 차단, 2026-06-01 완전 종료 (출처: ai.google.dev/gemini-api/docs/deprecations) |
+| **탈락: GPT-4o-mini** | 구성 분석 정확도 11% (GPT-4o 57% 대비), complex scene에서 unknown 포기 — 동일 5프레임 직접 비교: Gemini cond_good/0.90 vs GPT unknown/0.50 (000060.jpg) |
+| **탈락: qwen2.5vl:7b (로컬)** | 전 프레임 unknown 출력, 23개 카테고리 프롬프트 이해 불가 |
+| **탈락: gemma4:26b (로컬)** | 29~40초/프레임(워밍업 후), M5 MacBook Air 팬리스 발열·수명 부담 |
+| **비용 (545장)** | $0.42 (입력 $0.30/M토큰, 출력 $2.50/M토큰) |
+| **맥북 부담** | API 방식 — GPU 0%, CPU <10%, 발열 없음 |
+
+#### Vision LLM 비용 비교 (545장 기준)
+
+| 모델 | 비용 | 비고 |
+|------|------|------|
+| GPT-4o-mini | $0.16 | complex scene 품질 약함 |
+| **gemini-2.5-flash** | **$0.42** | **현재 채택** |
+| Qwen-VL-Max | $0.83 | 한국어·복잡 장면 미검증 |
+| Claude Haiku 4.5 | $1.12 | — |
+| GPT-4o / Grok-2-vision | $2.25~2.61 | 과도한 비용 |
+
+#### API → 파인튜닝 전환 임계값
+
+| 단계 | 라벨 수 | 행동 |
+|------|---------|------|
+| Phase 1~2 | 0 → 3,000건 | Gemini API 유지 (예상 총비용 ~$2.3) |
+| Phase 3 검토 시작 | **3,000건** | 파인튜닝 실험 (Cohen's Kappa ≥ 0.80 확인 후) |
+| API 완전 대체 | **5,000건** | 자체 모델 정확도 ≥ Gemini 기준 시 중단 |
+
+### A-11. 행동 분류기 파인튜닝 전략 (Phase 3+, 2026-04-14)
+
+> 포즈 추정 모델(YOLOv8n-pose, Phase 4+)과 별도. 행동 분류에 특화된 경량 분류기.
+
+#### 후보 모델 비교
+
+| 모델 | 크기 | iPhone 추론 | Android (S23) | RPi 5 | 권장 용도 |
+|------|------|------------|---------------|-------|---------|
+| **YOLOv8-cls nano** | 3.8 MB | ~70ms | ~100ms | ~700ms | CPU 환경, 고FPS |
+| **MobileViT-S** | 5.6 MB | <33ms | 4.7ms | ~300ms | 모바일 최우선 |
+
+- **최소 학습 데이터**: 카테고리당 100~350장 → 23개 카테고리 × 200장 = **4,600장 권장**
+  (출처: Ultralytics YOLOv8 classification guide — 100장/클래스에서 수렴 가능, 300장에서 안정)
+- **전이학습 필수**: ImageNet 사전학습 가중치에서 파인튜닝 (scratch 대비 10배 데이터 절약)
+- **내보내기**: YOLOv8 → TFLite / CoreML / ONNX 자동 지원 (ultralytics export)
+
+#### 파인튜닝 실험 트리거
+
+| 트리거 | 조건 | 행동 |
+|--------|------|------|
+| 1차 실험 | 자체 라벨 500건 | YOLOv8-cls nano 소규모 학습, 정확도 측정 |
+| 본격 검토 | 자체 라벨 3,000건 + Kappa ≥ 0.80 | MobileViT-S vs YOLOv8-cls 비교 |
+| API 대체 | 자체 모델 정확도 ≥ Gemini 85% | Gemini API 호출 중단 |
 
 ### A-03. 라벨 출력 포맷 (B-03)
 - **기반**: TaillogToss `presets.ts` (6 categories × 21 behaviors)
